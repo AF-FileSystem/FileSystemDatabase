@@ -13,46 +13,35 @@ namespace Client_Test
             // Буффер входящих данных.
             byte[] bytes = new Byte[1024];
 
-            //Установление удаленной конечной точки для сокета.
-            IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
-            IPAddress ipAddress = ipHostInfo.AddressList[0];
-            IPEndPoint remoteEP = new IPEndPoint(ipAddress, 11000);
+            IPAddress ServAddr = IPAddress.Parse("192.168.7.101");
+            Int32 port = 13000;
+            TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
 
-            //Создание TCP/IP сокета
-            Socket sendr = new Socket(AddressFamily.InterNetworkV6,
-                SocketType.Stream, ProtocolType.Tcp);
+            Byte[] data = Encoding.ASCII.GetBytes("Hello!");
+
+            NetworkStream stream = clnt.GetStream();
 
             try
             {
+                // Отправка сообщения ТСР серверу. 
+                stream.Write(data, 0, data.Length);
 
-                sendr.Connect(remoteEP);
+                Console.WriteLine("Sent: Hello!");
+                // Буффер дл получения ответа.
+                data = new Byte[256];
 
-                Console.WriteLine("Socket connected to {0}",
-                    sendr.RemoteEndPoint.ToString());
+                // Сткрока для храниения ASCII-варианта ответа.
+                String responseData = String.Empty;
 
-                // Кодировка сообщения.
-                byte[] msg = Encoding.ASCII.GetBytes("This is a test<EOF>");
+                // Прочесть ответ сервера.
+                Int32 bytes_1 = stream.Read(data, 0, data.Length);
+                responseData = Encoding.ASCII.GetString(data, 0, bytes_1);
+                Console.WriteLine("Received: {0}", responseData);
 
-                // Отправка сообщения через сокет.
-                int bytesSent = sendr.Send(msg);
+                // Закрыть все.
+                stream.Close();
+                clnt.Close();
 
-                // Получение ответа от сервера.
-                int bytesRec = sendr.Receive(bytes);
-                Console.WriteLine("Echoed test = {0}",
-                    Encoding.ASCII.GetString(bytes, 0, bytesRec));
-
-                // Release the socket.
-                sendr.Shutdown(SocketShutdown.Both);
-                sendr.Close();
-
-            }
-            catch (ArgumentNullException anex)
-            {
-                Console.WriteLine("ArgumentNullException : {0}", anex.ToString());
-            }
-            catch (SocketException sex)
-            {
-                Console.WriteLine("SocketException : {0}", sex.ToString());
             }
             catch (Exception ex)
             {
