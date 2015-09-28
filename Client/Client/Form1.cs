@@ -14,56 +14,60 @@ namespace Client
 {
     public partial class Form1 : Form
     {
+        private string folder = @"D:\DFS_Client";
         public Form1()
         {
             InitializeComponent();
         }
 
-        public static void StartClient()
+        public static void StartClient(ListView a)
         {
             // Буффер входящих данных.
             byte[] bytes = new Byte[1024];
+            // Проверка.
+            string checker = "";
 
-            //Установление удаленной конечной точки для сокета.
-            IPHostEntry ipHostInfo = Dns.GetHostEntry(Dns.GetHostName());
-            IPAddress ipAddress = ipHostInfo.AddressList[0];
-            IPEndPoint remoteEP = new IPEndPoint(ipAddress, 11000);
+            IPAddress ServAddr = IPAddress.Parse("192.168.7.101");
+            Int32 port = 13000;
+            TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
 
-            //Создание TCP/IP сокета
-            Socket sendr = new Socket(AddressFamily.InterNetworkV6,
-                SocketType.Stream, ProtocolType.Tcp);
+            Byte[] data = Encoding.ASCII.GetBytes("Hello!");
+
+            NetworkStream stream = clnt.GetStream();
 
             try
             {
+                while (checker != "End of list")
+                {
 
-                sendr.Connect(remoteEP);
+                    // Буффер дл получения ответа.
+                    data = new Byte[256];
 
-                Console.WriteLine("Socket connected to {0}",
-                    sendr.RemoteEndPoint.ToString());
+                    // Сткрока для храниения ASCII-варианта ответа.
+                    String responseData = String.Empty;
 
-                // Кодировка сообщения.
-                byte[] msg = Encoding.ASCII.GetBytes("This is a test<EOF>");
+                    // Прочесть ответ сервера.
+                    Int32 bytes_1 = stream.Read(data, 0, data.Length);
+                    responseData = Encoding.ASCII.GetString(data, 0, bytes_1);
+                    if (responseData != "End of list")
+                    {
+                        a.Items.Add(responseData);
+                    }
+                    checker = responseData;
 
-                // Отправка сообщения через сокет.
-                int bytesSent = sendr.Send(msg);
 
-                // Получение ответа от сервера.
-                int bytesRec = sendr.Receive(bytes);
-                Console.WriteLine("Echoed test = {0}",
-                    Encoding.ASCII.GetString(bytes, 0, bytesRec));
+                    // Декодирование данных.
+                    responseData = responseData.ToUpper();
 
-                // Release the socket.
-                sendr.Shutdown(SocketShutdown.Both);
-                sendr.Close();
+                    byte[] msg = Encoding.ASCII.GetBytes(responseData);
 
-            }
-            catch (ArgumentNullException anex)
-            {
-                Console.WriteLine("ArgumentNullException : {0}", anex.ToString());
-            }
-            catch (SocketException sex)
-            {
-                Console.WriteLine("SocketException : {0}", sex.ToString());
+                    // Отослать назад уведомление.
+                    stream.Write(msg, 0, msg.Length);
+                }
+                // Закрыть все.
+                stream.Close();
+                clnt.Close();
+
             }
             catch (Exception ex)
             {
@@ -71,9 +75,68 @@ namespace Client
             }
         }
 
+
         private void button1_Click(object sender, EventArgs e)
         {
+            StartClient(listView1);
+            button1.Visible = false;
+        }
 
+        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            // Set the view to show details.
+            listView1.View = View.Details;
+            // Allow the user to edit item text.
+            listView1.LabelEdit = true;
+            // Allow the user to rearrange columns.
+            listView1.AllowColumnReorder = true;
+            // Select the item and subitems when selection is made.
+            listView1.FullRowSelect = true;
+            // Display grid lines.
+            listView1.GridLines = true;
+            // Sort the items in the list in ascending order.
+            listView1.Sorting = SortOrder.Ascending;
+
+            // Create columns for the items and subitems.
+            // Width of -2 indicates auto-size.
+            listView1.Columns.Add("Name", 130, HorizontalAlignment.Left);
+        }
+
+        private void listView1_ItemActivate(object sender, EventArgs e)
+        {
+            string act = listView1.SelectedItems[0].SubItems[0].Text.ToString();
+
+            try
+            {
+                File_Reciever FR = new File_Reciever(14000);
+                FR.Receiving(folder);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Something went wrong", "Warning");
+            }
+        }
+        }
+
+    class File_Sender
+    { }
+    class File_Reciever
+    {
+        int port;
+        string name_of_file;
+        public File_Reciever(int p)
+        {
+            port = p;
+        }
+
+        public void Receiving(string s)
+        {
+            name_of_file = s;
         }
     }
 }

@@ -7,7 +7,18 @@ using System.IO;
 namespace Server_Hub
 {
     class Request_Handler
-    { }
+    {
+        int port;
+        public Request_Handler(int p)
+        {
+            this.port = p;
+        }
+
+        public void Handling()
+        {
+
+        }
+    }
     class File_Translator
     { }
     class Server
@@ -78,7 +89,9 @@ namespace Server_Hub
                     filenames = Encoding.ASCII.GetBytes(flnme);
                     stream.Write(filenames, 0, filenames.Length);
                     Console.WriteLine("Sent: {0}", flnme);
-
+                    // Начало работы с файлами.
+                    Request_Handler RH = new Request_Handler(15000);
+                    RH.Handling();
                     // Закрытие соединения.
                     client.Close();
                 }
