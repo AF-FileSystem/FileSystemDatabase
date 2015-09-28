@@ -2,9 +2,14 @@
 using System.Text;
 using System.Net.Sockets;
 using System.Net;
+using System.IO;
 
 namespace Server_Hub
 {
+    class Request_Handler
+    { }
+    class File_Translator
+    { }
     class Server
     {
         // Входящие данные от клиента.
@@ -16,10 +21,13 @@ namespace Server_Hub
             IPAddress localAddr = IPAddress.Parse("192.168.7.101");
             Int32 port = 13000;
             lstnr = new TcpListener(localAddr, port);
+            string flnme;
 
             // Буффер входящих сообщений.
             Byte[] bytes = new Byte[1024];
-            
+            Byte[] filenames;
+            string checkr;
+            Int32 ch;
 
             // Привязка сокета к конечной точке и ожидание коннектов.
             try
@@ -45,22 +53,31 @@ namespace Server_Hub
 
                     int i;
 
-                    // Зацикливаем получение данных от клиента.
-                    while ((i = stream.Read(bytes, 0, bytes.Length)) != 0)
+                    // Зацикливаем получение данных от клиента.                 
+                    string[] dirs = Directory.GetFiles(@"D:\DFS");
+                    for (int q = 0;q<dirs.Length;q++)
                     {
-                        // Перевод данных в ASCII.
-                        data = Encoding.ASCII.GetString(bytes, 0, i);
-                        Console.WriteLine("Received: {0}", data);
-
-                        // Декодирование данных.
-                        data = data.ToUpper();
-
-                        byte[] msg = Encoding.ASCII.GetBytes(data);
-
-                        // Отослать назад уведомление.
-                        stream.Write(msg, 0, msg.Length);
-                        Console.WriteLine("Sent: {0}", data);
+                        FileInfo inf = new FileInfo(dirs[q]);
+                        flnme = (Path.GetFileName(dirs[q]));
+                        filenames = Encoding.ASCII.GetBytes(flnme);
+                        stream.Write(filenames, 0, filenames.Length);
+                        Console.WriteLine("Sent: {0}", flnme);
+                        while (true)
+                        {
+                            // Прочесть ответ сервера.
+                            Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
+                            checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
+                            if (checkr!="")
+                            {
+                                checkr = "";
+                                break;
+                            }
+                        }
                     }
+                    flnme = "End of list";
+                    filenames = Encoding.ASCII.GetBytes(flnme);
+                    stream.Write(filenames, 0, filenames.Length);
+                    Console.WriteLine("Sent: {0}", flnme);
 
                     // Закрытие соединения.
                     client.Close();
