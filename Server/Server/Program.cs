@@ -12,7 +12,7 @@ namespace Server_Hub
 
         public static void StartListening()
         {
-            // Буффер входящих данных.
+            // Буффер входящих данных. 
             byte[] bytes = new Byte[1024];
 
             // Установление удаленной конечной точки для сокета.
