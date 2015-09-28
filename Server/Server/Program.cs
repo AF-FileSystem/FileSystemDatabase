@@ -21,7 +21,7 @@ namespace Server_Hub
             IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
 
             // Создание TCP\IP сокета.
-            Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            Socket listener = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
 
             // Привязка сокета к конечной точке и ожидание коннектов.
             try
