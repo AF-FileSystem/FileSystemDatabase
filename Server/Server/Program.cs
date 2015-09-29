@@ -5,7 +5,16 @@ using System.Net;
 using System.IO;
 
 namespace Server_Hub
-{
+{   class Hasher
+    {
+        public Hasher()
+        { }
+        public Int32 HashMe(byte[] a)
+        {
+            Int32 ans=0;
+            return ans;
+        }
+    } 
     class Request_Handler
     {
         int port;
@@ -50,7 +59,13 @@ namespace Server_Hub
                 responseData = Encoding.ASCII.GetString(data, 0, bytes_1);
 
                 Console.WriteLine("Request for " + responseData);
+                /*
+                //Отправка файлов.
+                File_Translator FT = new File_Translator(15000);
+                FT.Send(responseData);
+                */
 
+                Console.WriteLine("Handling completed!");
             }
             catch (Exception e)
             {
@@ -60,7 +75,17 @@ namespace Server_Hub
     }
     }
     class File_Translator
-    { }
+    {
+        private int port;
+        public File_Translator(int p)
+        {
+            this.port = p;
+        }
+        public void Send(string s)
+        {
+
+        }
+    }
     class Server
     {
         // Входящие данные от клиента.
@@ -133,7 +158,7 @@ namespace Server_Hub
                     client.Close();
                     // Начало работы с файлами.
                     Request_Handler RH = new Request_Handler(15000);
-                    RH.Handling();                    
+                    RH.Handling();
                 }
 
             }

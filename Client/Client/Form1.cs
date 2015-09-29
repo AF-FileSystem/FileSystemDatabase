@@ -163,6 +163,30 @@ namespace Client
             Byte[] filenames;
             filenames = Encoding.ASCII.GetBytes(name_of_file);
             stream.Write(filenames, 0, filenames.Length);
+            
+            /*
+            while (checker!="End of file")
+            {
+
+                // Буффер дл получения ответа.
+                data = new Byte[256];
+
+                // Сткрока для храниения ASCII-варианта ответа.
+                String responseData = String.Empty;
+
+                // Прочесть ответ сервера.
+            }
+            */
+        }
+    }
+    class Hasher
+    {
+        public Hasher()
+        { }
+        public Int32 HashMe(byte[] a)
+        {
+            Int32 ans = 0;
+            return ans;
         }
     }
 }

@@ -106,7 +106,7 @@
             this.MaximumSize = new System.Drawing.Size(450, 350);
             this.MinimumSize = new System.Drawing.Size(450, 350);
             this.Name = "Form1";
-            this.Text = "Distrebuted File System";
+            this.Text = "Distributed File System";
             this.Load += new System.EventHandler(this.Form1_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
