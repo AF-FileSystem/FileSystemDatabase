@@ -25,7 +25,9 @@ namespace Server_Hub
 
         public void Handling(Socket s)
         {
-            byte[] filenames;
+            string checkr;
+            byte[] bytes = new byte[1024];
+            byte[] filenames = new byte[1024];
             string flnme;
             string[] dirs = Directory.GetFiles(@"D:\DFS");
             for (int q = 0; q < dirs.Length; q++) {
@@ -36,7 +38,8 @@ namespace Server_Hub
                 Console.WriteLine("Sent: {0}", flnme);
                 while (true) {
                     // Прочесть ответ сервера.
-                    //Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
+                    Int32 bytes_1 = s.Receive(bytes);
+                    
                     checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
                     if (checkr != "") {
                         checkr = "";
@@ -46,7 +49,7 @@ namespace Server_Hub
             }
             flnme = "End of list";
             filenames = Encoding.ASCII.GetBytes(flnme);
-            stream.Write(filenames, 0, filenames.Length);
+            s.Send(filenames);
             Console.WriteLine("Sent: {0}", flnme);
 
         }
@@ -98,19 +101,7 @@ namespace Server_Hub
                     Socket handler = listener.Accept();
                     Console.WriteLine("Connected!");
 
-                    String data = null;
-
-                    // Выделяем поток
-
-                    int i;
-
-                    // Зацикливаем получение данных от клиента.                 
                     
-                    // Закрытие соединения.
-                    client.Close();
-                    // Начало работы с файлами.
-                    Request_Handler RH = new Request_Handler(15000);
-                    RH.Handling();
                 }
 
             }
