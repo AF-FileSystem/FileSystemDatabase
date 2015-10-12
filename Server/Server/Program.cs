@@ -18,28 +18,37 @@ namespace Server_Hub
     } 
     class Request_Handler
     {
-        int port;
-        public Request_Handler(int p)
+        Socket socks;
+        TcpClient cli;
+        public Request_Handler(Socket s)
         {
-            this.port = p;
+            this.socks = s;
         }
 
-        public void Handling(Socket s)
+        public Request_Handler(TcpClient c)
+        {
+            cli = c;
+        }
+
+        public void Handling()
         {
             string checkr;
             byte[] bytes = new byte[1024];
             byte[] filenames = new byte[1024];
             string flnme;
-            string[] dirs = Directory.GetFiles(@"D:\DFS");
+            NetworkStream stream = cli.GetStream();
+            string[] dirs = Directory.GetFiles(@"E:\Music");
             for (int q = 0; q < dirs.Length; q++) {
                 FileInfo inf = new FileInfo(dirs[q]);
                 flnme = (Path.GetFileName(dirs[q]));
                 filenames = Encoding.ASCII.GetBytes(flnme);
-                s.Send(filenames);
+                //socks.Send(filenames);
+                stream.Write(filenames, 0, filenames.Length);
                 Console.WriteLine("Sent: {0}", flnme);
                 while (true) {
                     // Прочесть ответ сервера.
-                    Int32 bytes_1 = s.Receive(bytes);
+                    //Int32 bytes_1 = socks.Receive(bytes);
+                    Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
                     
                     checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
                     if (checkr != "") {
@@ -50,7 +59,8 @@ namespace Server_Hub
             }
             flnme = "End of list";
             filenames = Encoding.ASCII.GetBytes(flnme);
-            s.Send(filenames);
+            stream.Write(filenames, 0, filenames.Length);
+            //socks.Send(filenames);
             Console.WriteLine("Sent: {0}", flnme);
 
         }
@@ -74,23 +84,22 @@ namespace Server_Hub
 
         public static void StartListening()
         {
-            IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, 11000);
-            Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            string flnme;
+            IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, 13000);
+            //Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            TcpListener listener = new TcpListener(IPAddress.Any, 13000);
+            
 
             // Буффер входящих сообщений.
             Byte[] bytes = new Byte[1024];
-            Byte[] filenames;
-            string checkr;
-            Int32 ch;
-
+            
             // Привязка сокета к конечной точке и ожидание коннектов.
             try
             {
 
                 // Начало прослушки.
-                listener.Bind(EndPoint);
-                listener.Listen(100);
+                //               listener.Bind(EndPoint);
+                //            listener.Listen(100);
+                listener.Start();
 
                 // Начало прослушки.
                 while (true)
@@ -99,11 +108,14 @@ namespace Server_Hub
                     Console.Write("Waiting for a connection... ");
 
                     // Потверждение соединения.
-                    Socket handler = listener.Accept();
-                    Thread thread = new Thread()
+                    TcpClient client = listener.AcceptTcpClient();
+                    Console.WriteLine("Connected!");
+                    //Socket handler = listener.Accept();
+                    Request_Handler RH = new Request_Handler(client);
+                    new Thread(RH.Handling).Start();
                     Console.WriteLine("Connected!");
 
-                    
+
                 }
 
             }

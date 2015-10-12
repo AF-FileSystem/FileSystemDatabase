@@ -27,10 +27,8 @@ namespace Client
             byte[] bytes = new Byte[1024];
             // Проверка.
             string checker = "";
-
-            IPAddress ServAddr = IPAddress.Parse("172.16.16.95");
             Int32 port = 13000;
-            TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
+            TcpClient clnt = new TcpClient("192.168.7.108", port);
 
             Byte[] data;
 
@@ -152,7 +150,7 @@ namespace Client
             // Проверка.
             string checker = "";
 
-            IPAddress ServAddr = IPAddress.Parse("172.16.16.95");
+            IPAddress ServAddr = IPAddress.Parse("192.168.0.101");
             Int32 port = 15000;
             TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
 
