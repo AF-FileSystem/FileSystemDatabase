@@ -4,6 +4,8 @@ using System.Net.Sockets;
 using System.Net;
 using System.IO;
 using System.Threading;
+using Messages;
+
 
 namespace Server_Hub
 {   class Hasher

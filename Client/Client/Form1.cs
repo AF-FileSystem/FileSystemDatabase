@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Net.Sockets;
 using System.Net;
+using Messages;
 
 namespace Client
 {
@@ -21,6 +22,7 @@ namespace Client
             InitializeComponent();
         }
 
+        
         public static void StartClient(ListView a)
         {
             // Буффер входящих данных.
