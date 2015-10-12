@@ -3,6 +3,7 @@ using System.Text;
 using System.Net.Sockets;
 using System.Net;
 using System.IO;
+using System.Threading;
 
 namespace Server_Hub
 {   class Hasher
@@ -71,7 +72,7 @@ namespace Server_Hub
         // Входящие данные от клиента.
         public static string data = null;
 
-        public void StartListening()
+        public static void StartListening()
         {
             IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, 11000);
             Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -99,6 +100,7 @@ namespace Server_Hub
 
                     // Потверждение соединения.
                     Socket handler = listener.Accept();
+                    Thread thread = new Thread()
                     Console.WriteLine("Connected!");
 
                     
