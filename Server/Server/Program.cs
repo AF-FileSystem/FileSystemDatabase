@@ -23,56 +23,33 @@ namespace Server_Hub
             this.port = p;
         }
 
-        public void Handling()
+        public void Handling(Socket s)
         {
-            TcpListener lstnr = null;
-            IPAddress localAddr = IPAddress.Parse("172.16.16.95");
-            Int32 port = this.port;
-            lstnr = new TcpListener(localAddr, port);
+            byte[] filenames;
             string flnme;
-
-            // Буффер входящих сообщений.
-            Byte[] bytes = new Byte[1024];
-
-            // Привязка сокета к конечной точке и ожидание коннектов.
-            try
-            {
-
-                // Начало прослушки.
-                lstnr.Start();
-
-                Console.Write("Start handling... ");
-
-                // Потверждение соединения.
-                TcpClient client = lstnr.AcceptTcpClient();
-                // Выделяем поток
-                NetworkStream stream = client.GetStream();
-
-                // Буффер дл получения ответа.
-                Byte[] data = new Byte[256];
-
-                // Сткрока для храниения ASCII-варианта ответа.
-                String responseData = String.Empty;
-
-                // Прочесть ответ сервера.
-                Int32 bytes_1 = stream.Read(data, 0, data.Length);
-                responseData = Encoding.ASCII.GetString(data, 0, bytes_1);
-
-                Console.WriteLine("Request for " + responseData);
-                /*
-                //Отправка файлов.
-                File_Translator FT = new File_Translator(15000);
-                FT.Send(responseData);
-                */
-
-                Console.WriteLine("Handling completed!");
+            string[] dirs = Directory.GetFiles(@"D:\DFS");
+            for (int q = 0; q < dirs.Length; q++) {
+                FileInfo inf = new FileInfo(dirs[q]);
+                flnme = (Path.GetFileName(dirs[q]));
+                filenames = Encoding.ASCII.GetBytes(flnme);
+                s.Send(filenames);
+                Console.WriteLine("Sent: {0}", flnme);
+                while (true) {
+                    // Прочесть ответ сервера.
+                    //Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
+                    checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
+                    if (checkr != "") {
+                        checkr = "";
+                        break;
+                    }
+                }
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
-        
-    }
+            flnme = "End of list";
+            filenames = Encoding.ASCII.GetBytes(flnme);
+            stream.Write(filenames, 0, filenames.Length);
+            Console.WriteLine("Sent: {0}", flnme);
+
+        }
     }
     class File_Translator
     {
@@ -91,12 +68,10 @@ namespace Server_Hub
         // Входящие данные от клиента.
         public static string data = null;
 
-        public static void StartListening()
+        public void StartListening()
         {
-            TcpListener lstnr = null;       
-            IPAddress localAddr = IPAddress.Parse("172.16.16.95");
-            Int32 port = 13000;
-            lstnr = new TcpListener(localAddr, port);
+            IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, 11000);
+            Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             string flnme;
 
             // Буффер входящих сообщений.
@@ -110,7 +85,8 @@ namespace Server_Hub
             {
 
                 // Начало прослушки.
-                lstnr.Start();
+                listener.Bind(EndPoint);
+                listener.Listen(100);
 
                 // Начало прослушки.
                 while (true)
@@ -119,41 +95,17 @@ namespace Server_Hub
                     Console.Write("Waiting for a connection... ");
 
                     // Потверждение соединения.
-                    TcpClient client = lstnr.AcceptTcpClient();
+                    Socket handler = listener.Accept();
                     Console.WriteLine("Connected!");
 
                     String data = null;
 
                     // Выделяем поток
-                    NetworkStream stream = client.GetStream();
 
                     int i;
 
                     // Зацикливаем получение данных от клиента.                 
-                    string[] dirs = Directory.GetFiles(@"D:\DFS");
-                    for (int q = 0;q<dirs.Length;q++)
-                    {
-                        FileInfo inf = new FileInfo(dirs[q]);
-                        flnme = (Path.GetFileName(dirs[q]));
-                        filenames = Encoding.ASCII.GetBytes(flnme);
-                        stream.Write(filenames, 0, filenames.Length);
-                        Console.WriteLine("Sent: {0}", flnme);
-                        while (true)
-                        {
-                            // Прочесть ответ сервера.
-                            Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                            checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
-                            if (checkr!="")
-                            {
-                                checkr = "";
-                                break;
-                            }
-                        }
-                    }
-                    flnme = "End of list";
-                    filenames = Encoding.ASCII.GetBytes(flnme);
-                    stream.Write(filenames, 0, filenames.Length);
-                    Console.WriteLine("Sent: {0}", flnme);
+                    
                     // Закрытие соединения.
                     client.Close();
                     // Начало работы с файлами.
