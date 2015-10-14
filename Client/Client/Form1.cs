@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -16,7 +17,9 @@ namespace Client
     public partial class Form1 : Form
     {
         string act;
+        public static string adress = "192.168.7.101";
         private string folder = @"D:\DFS_Client";
+        public static TcpClient clnt;
         public Form1()
         {
             InitializeComponent();
@@ -30,7 +33,7 @@ namespace Client
             // Проверка.
             string checker = "";
             Int32 port = 13000;
-            TcpClient clnt = new TcpClient("192.168.7.108", port);
+            clnt = new TcpClient(adress, port);
 
             Byte[] data;
 
@@ -53,17 +56,17 @@ namespace Client
                     if (responseData != "End of list")
                     {
                         a.Items.Add(responseData);
+
+                        // Декодирование данных.
+                        responseData = responseData.ToUpper();
+
+                        byte[] msg = Encoding.ASCII.GetBytes(responseData);
+
+                        // Отослать назад уведомление.
+                        stream.Write(msg, 0, msg.Length);
                     }
                     checker = responseData;
 
-
-                    // Декодирование данных.
-                    responseData = responseData.ToUpper();
-
-                    byte[] msg = Encoding.ASCII.GetBytes(responseData);
-
-                    // Отослать назад уведомление.
-                    stream.Write(msg, 0, msg.Length);
                 }
                 // Закрыть все.
                 stream.Close();
@@ -129,7 +132,7 @@ namespace Client
             groupBox1.Visible = false;
             label1.Text = "";
             File_Reciever FR = new File_Reciever(15000);
-            FR.Receiving(act);
+            FR.Receiving(clnt, act);
         }
     }
 
@@ -144,39 +147,45 @@ namespace Client
             port = p;
         }
 
-        public void Receiving(string s)
+        public void Receiving(TcpClient cl ,string s)
         {
 
             // Буффер входящих данных.
             byte[] bytes = new Byte[1024];
-            // Проверка.
+            // Объявление переменных.
             string checker = "";
+            const int buffersz = 16384;
+            byte[] buffer = new byte[buffersz];
+            int btscpd = 0;
+            byte[] pack = new byte[1024];
 
-            IPAddress ServAddr = IPAddress.Parse("192.168.0.101");
-            Int32 port = 15000;
+            // Выделение сервера
+            IPAddress ServAddr = IPAddress.Parse(Form1.adress);
+            Int32 port = 13000;
             TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
 
-            Byte[] data;
+            string path = Path.Combine(@"D:\DFS_Client", s);
 
-            NetworkStream stream = clnt.GetStream();
-            name_of_file = s;
-            Byte[] filenames;
-            filenames = Encoding.ASCII.GetBytes(name_of_file);
-            stream.Write(filenames, 0, filenames.Length);
-            
-            /*
-            while (checker!="End of file")
+
+            using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (NetworkStream stream = clnt.GetStream())
             {
 
-                // Буффер дл получения ответа.
-                data = new Byte[256];
+                do
+                {
+                    // Буффер дл получения ответа.
+                    pack = new Byte[256];
 
-                // Сткрока для храниения ASCII-варианта ответа.
-                String responseData = String.Empty;
+                    // Прочесть ответ сервера.
+                    Int32 bytes_1 = stream.Read(pack, 0, pack.Length);
+                    checker = Encoding.ASCII.GetString(pack, 0, bytes_1);
+                    if (checker != "End of file")
+                    {
+                        outFile.Write(pack, 0, bytes_1);
+                    }
 
-                // Прочесть ответ сервера.
+                } while (checker!= "End of file") ;
             }
-            */
         }
     }
     class Hasher
