@@ -22,66 +22,45 @@ namespace Server_Hub
     {
         Socket socks;
         TcpClient cli;
-        public Request_Handler(Socket s)
+        public Request_Handler()
         {
-            this.socks = s;
         }
 
-        public Request_Handler(TcpClient c)
+        public Request_Handler(Socket c)
         {
-            cli = c;
+            this.socks = c;
         }
 
         public void Handling()
         {
             // Объявление переменных.
-            string checkr;
             byte[] bytes = new byte[1024];
             byte[] filenames = new byte[1024];
             string flnme;
-
-            // Выделение потока для отправки списка.
-            NetworkStream stream = cli.GetStream();
-
-            // Отправка списка файлов.
-            string[] dirs = Directory.GetFiles(@"D:\DFS");
-            for (int q = 0; q < dirs.Length; q++) {
-                FileInfo inf = new FileInfo(dirs[q]);
-                flnme = (Path.GetFileName(dirs[q]));
-                filenames = Encoding.ASCII.GetBytes(flnme);
-                stream.Write(filenames, 0, filenames.Length);
-                Console.WriteLine("Sent: {0}", flnme);
-                while (true) {
-                    Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                    
-                    checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
-                    if (checkr != "") {
-                        checkr = "";
-                        break;
-                    }
-                }
-            }
-
-            // Отправка уведомления о завершении передачи.
-            flnme = "End of list";
-            filenames = Encoding.ASCII.GetBytes(flnme);
-            stream.Write(filenames, 0, filenames.Length);
-            Console.WriteLine("Sent: {0}", flnme);
-
-            // Получение информации о получаемом файле.
-            flnme = "";
-            // Буффер дл получения ответа.
-            Byte[] data = new Byte[256];
-            while ((flnme == ""))
+            while (true)
             {
-                // Прочесть ответ сервера.
-                Int32 bytes_1 = stream.Read(data, 0, data.Length);
-                flnme = Encoding.ASCII.GetString(data, 0, bytes_1);
-                
+                // Выделение потока для чтения запроса.
+                Stream stream = new NetworkStream(socks);
+
+                // Буффер дл получения ответа.
+                flnme = "";
+                Byte[] data = new Byte[256];
+
+                // Цикл ожидания ответа.
+                while (flnme == "")
+                {
+                    // Прочесть запрос клиента.
+                    Int32 bytes_1 = stream.Read(data, 0, data.Length);
+                    flnme = Encoding.ASCII.GetString(data, 0, bytes_1);
+                }
+
+                // Отчет о начале передачи.
+                Console.WriteLine("Handling thread: Start sending protocol for " + flnme);
+
+                // Запуск передачи файла.
+                File_Translator FT = new File_Translator(cli, flnme);
+                new Thread(FT.Sending).Start();
             }
-            Console.WriteLine(flnme+ "!!!");
-            File_Translator FT = new File_Translator(cli, flnme);
-            new Thread(FT.Sending).Start();
         }
     }
     class File_Translator
@@ -106,14 +85,18 @@ namespace Server_Hub
             byte[] bytes = new byte[1024];
             byte[] filenames = new byte[1024];
                         
+            // Выделение пути к запрашиваемому файлу.
             string path = Path.Combine(@"D:\DFS", flname);
 
-            // Отправка списка файлов.
+            // Отправка файла
             if (File.Exists(path))
             {
+                // Выделение констант.
                 const int buffersz = 16384;
                 byte[] buffer = new byte[buffersz];
                 int btscpd = 0;
+
+                // Начало передачи.
                 using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (NetworkStream stream = cli.GetStream())
                 {
@@ -140,10 +123,9 @@ namespace Server_Hub
                     } while (btscpd > 0);
 
                     // Отправка уведомления о конце файла.
-                    checkr = "End of file";
-                    filenames = Encoding.ASCII.GetBytes(checkr);
+                    filenames = Encoding.ASCII.GetBytes("End of file");
                     stream.Write(filenames, 0, filenames.Length);
-                    Console.WriteLine("Sent: {0}", checkr);
+                    Console.WriteLine("Translation thread: File has been sent.");
                 }
 
             }           
@@ -158,37 +140,67 @@ namespace Server_Hub
 
         public static void StartListening()
         {
+            // Выделение сокета.
             IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, 13000);
-            //Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            TcpListener listener = new TcpListener(IPAddress.Any, 13000);
+            Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             
 
             // Буффер входящих сообщений.
             Byte[] bytes = new Byte[1024];
             
-            // Привязка сокета к конечной точке и ожидание коннектов.
             try
             {
-
                 // Начало прослушки.
-                //listener.Bind(EndPoint);
-                //listener.Listen(100);
-                listener.Start();
-
-                // Начало прослушки.
+                listener.Bind(EndPoint);
+                listener.Listen(100);
+                Console.WriteLine("Main thread: Waiting for a connection... ");
+                
+                // Ожидание соединения.
                 while (true)
                 {
-
-                    Console.WriteLine("Waiting for a connection... ");
-
                     // Потверждение соединения.
-                    TcpClient client = listener.AcceptTcpClient();
-                    //Socket handler = listener.Accept();
+                    Socket client = listener.Accept();
+                    Console.WriteLine("Main thread: Connected!");
+
+                    // Объявление переменных.
+                    string checkr;
+                    byte[] filenames = new byte[1024];
+                    string flnme;
+
+                    // Выделение потока для отправки списка.
+                    NetworkStream stream = new NetworkStream(client);
+
+                    // Отправка списка файлов.
+                    string[] dirs = Directory.GetFiles(@"D:\DFS");
+                    for (int q = 0; q < dirs.Length; q++)
+                    {
+                        FileInfo inf = new FileInfo(dirs[q]);
+                        flnme = (Path.GetFileName(dirs[q]));
+                        filenames = Encoding.ASCII.GetBytes(flnme);
+                        stream.Write(filenames, 0, filenames.Length);
+                        Console.WriteLine("Main thread: Sent: {0}", flnme);
+                        while (true)
+                        {
+                            Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
+                            checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
+                            if (checkr != "")
+                            {
+                                checkr = "";
+                                break;
+                            }
+                        }
+                    }
+
+                    // Отправка отчета о передаче всего списка.
+                    filenames = Encoding.ASCII.GetBytes("End of list");
+                    stream.Write(filenames, 0, filenames.Length);
+
+                    // Выделение потока для обработки запросов.
                     Request_Handler RH = new Request_Handler(client);
                     new Thread(RH.Handling).Start();
-                    Console.WriteLine("Connected!");
 
-
+                    //Завершение цикла.
+                    Console.WriteLine("Main thread: Waiting for a connection... ");
                 }
 
             }

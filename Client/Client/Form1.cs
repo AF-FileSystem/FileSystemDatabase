@@ -18,7 +18,6 @@ namespace Client
     {
         string act;
         public static string adress = "192.168.7.101";
-        private string folder = @"D:\DFS_Client";
         public static TcpClient clnt;
         public Form1()
         {
@@ -28,49 +27,40 @@ namespace Client
         
         public static void StartClient(ListView a)
         {
-            // Буффер входящих данных.
-            byte[] bytes = new Byte[1024];
-            // Проверка.
+            // Выделение переменных.
+            byte[] bytes = new Byte[1024];            
             string checker = "";
             Int32 port = 13000;
             clnt = new TcpClient(adress, port);
-
             Byte[] data;
 
+            // Выделение потока для получения списка файлов.
             NetworkStream stream = clnt.GetStream();
 
             try
             {
+                // Буффер дл получения ответа.
+                data = new Byte[256];
+
+                // Сткрока для храниения ASCII-варианта ответа.
+                String responseData = String.Empty;
+
                 while (checker != "End of list")
                 {
-
-                    // Буффер дл получения ответа.
-                    data = new Byte[256];
-
-                    // Сткрока для храниения ASCII-варианта ответа.
-                    String responseData = String.Empty;
-
                     // Прочесть ответ сервера.
                     Int32 bytes_1 = stream.Read(data, 0, data.Length);
                     responseData = Encoding.ASCII.GetString(data, 0, bytes_1);
                     if (responseData != "End of list")
                     {
+                        // Добавление файла в список.
                         a.Items.Add(responseData);
 
-                        // Декодирование данных.
-                        responseData = responseData.ToUpper();
-
-                        byte[] msg = Encoding.ASCII.GetBytes(responseData);
-
                         // Отослать назад уведомление.
+                        byte[] msg = Encoding.ASCII.GetBytes(responseData);
                         stream.Write(msg, 0, msg.Length);
                     }
                     checker = responseData;
-
                 }
-                // Закрыть все.
-                stream.Close();
-                clnt.Close();
 
             }
             catch (Exception ex)
@@ -84,11 +74,6 @@ namespace Client
         {
             StartClient(listView1);
             button1.Visible = false;
-        }
-
-        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -131,7 +116,7 @@ namespace Client
         {
             groupBox1.Visible = false;
             label1.Text = "";
-            File_Reciever FR = new File_Reciever(15000);
+            File_Reciever FR = new File_Reciever();
             FR.Receiving(clnt, act);
         }
     }
@@ -140,11 +125,8 @@ namespace Client
     { }
     class File_Reciever
     {
-        int port;
-        string name_of_file;
-        public File_Reciever(int p)
+        public File_Reciever()
         {
-            port = p;
         }
 
         public void Receiving(TcpClient cl ,string s)
@@ -161,19 +143,19 @@ namespace Client
 
             // Выделение сервера
             IPAddress ServAddr = IPAddress.Parse(Form1.adress);
-            Int32 port = 13000;
+            Int32 port = 15000;
             TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
 
+            // Выделение пути к файлу.
             string path = Path.Combine(@"D:\DFS_Client", s);
-
-
+            
             using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
             using (NetworkStream stream = clnt.GetStream())
             {
 
                 do
                 {
-                    // Буффер дл получения ответа.
+                    // Буффер для получения ответа.
                     pack = new Byte[256];
 
                     // Прочесть ответ сервера.
@@ -184,7 +166,7 @@ namespace Client
                         outFile.Write(pack, 0, bytes_1);
                     }
 
-                } while (checker!= "End of file") ;
+                } while (checker!= "End of file");
             }
         }
     }
