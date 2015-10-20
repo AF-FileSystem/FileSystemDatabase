@@ -17,7 +17,7 @@ namespace Client
     public partial class Form1 : Form
     {
         string act;
-        public static string adress = "192.168.7.101";
+        public static string adress = "192.168.7.102";
         public static TcpClient clnt;
         public Form1()
         {
@@ -117,7 +117,7 @@ namespace Client
             groupBox1.Visible = false;
             label1.Text = "";
             File_Reciever FR = new File_Reciever();
-            FR.Receiving(clnt, act);
+            FR.Receiving(act);
         }
     }
 
@@ -129,7 +129,7 @@ namespace Client
         {
         }
 
-        public void Receiving(TcpClient cl ,string s)
+        public void Receiving(string s)
         {
 
             // Буффер входящих данных.
@@ -140,11 +140,13 @@ namespace Client
             byte[] buffer = new byte[buffersz];
             int btscpd = 0;
             byte[] pack = new byte[1024];
+            byte[] filename = new byte[1024];
 
             // Выделение сервера
             IPAddress ServAddr = IPAddress.Parse(Form1.adress);
             Int32 port = 15000;
             TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
+
 
             // Выделение пути к файлу.
             string path = Path.Combine(@"D:\DFS_Client", s);
@@ -152,7 +154,8 @@ namespace Client
             using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
             using (NetworkStream stream = clnt.GetStream())
             {
-
+                filename = Encoding.ASCII.GetBytes(s);
+                stream.Write(filename, 0, filename.Length);
                 do
                 {
                     // Буффер для получения ответа.
@@ -164,9 +167,10 @@ namespace Client
                     if (checker != "End of file")
                     {
                         outFile.Write(pack, 0, bytes_1);
+                        stream.Write(pack, 0, pack.Length);
                     }
-
                 } while (checker!= "End of file");
+                MessageBox.Show("Downloading is complete!", "Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
     }

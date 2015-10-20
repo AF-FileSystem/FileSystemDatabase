@@ -20,7 +20,7 @@ namespace Server_Hub
     } 
     class Request_Handler
     {
-        Socket socks;
+        Socket listener;
         TcpClient cli;
         public Request_Handler()
         {
@@ -28,7 +28,7 @@ namespace Server_Hub
 
         public Request_Handler(Socket c)
         {
-            this.socks = c;
+            this.listener = c;
         }
 
         public void Handling()
@@ -37,15 +37,16 @@ namespace Server_Hub
             byte[] bytes = new byte[1024];
             byte[] filenames = new byte[1024];
             string flnme;
+            Console.WriteLine("Main thread: Waiting for a connection... ");
+            
+            // Потверждение соединения.
+            // Буффер дл получения ответа.
+            flnme = "";
+            Byte[] data = new Byte[256];
             while (true)
             {
-                // Выделение потока для чтения запроса.
-                Stream stream = new NetworkStream(socks);
-
-                // Буффер дл получения ответа.
-                flnme = "";
-                Byte[] data = new Byte[256];
-
+                Socket client = listener.Accept();
+                Stream stream = new NetworkStream(client);
                 // Цикл ожидания ответа.
                 while (flnme == "")
                 {
@@ -56,18 +57,22 @@ namespace Server_Hub
 
                 // Отчет о начале передачи.
                 Console.WriteLine("Handling thread: Start sending protocol for " + flnme);
-
+                
                 // Запуск передачи файла.
-                File_Translator FT = new File_Translator(cli, flnme);
-                new Thread(FT.Sending).Start();
+                File_Translator FT = new File_Translator(client, flnme);
+                Thread h = new Thread(FT.Sending);
+                h.Start();
+                h.Join();
+                h.Abort();
+                flnme = "";
             }
         }
     }
     class File_Translator
     {
-        TcpClient cli;
+        Socket cli;
         string flname;
-        public File_Translator(TcpClient c, string n)
+        public File_Translator(Socket c, string n)
         {
             this.cli = c;
             this.flname = n;
@@ -98,7 +103,7 @@ namespace Server_Hub
 
                 // Начало передачи.
                 using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (NetworkStream stream = cli.GetStream())
+                using (NetworkStream stream = new NetworkStream(cli))
                 {
                     do
                     {
@@ -107,7 +112,7 @@ namespace Server_Hub
                         {
                             // Отправка пакета.
                             stream.Write(buffer, 0, btscpd);
-
+                            
                             // Получение подтверждения.
                             while (true)
                             {
@@ -140,6 +145,15 @@ namespace Server_Hub
 
         public static void StartListening()
         {
+
+
+            // Выделение сокета для обработки запросов.
+            IPEndPoint EndPointa = new IPEndPoint(IPAddress.Any, 15000);
+            Socket socks = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            // Начало прослушки.
+            socks.Bind(EndPointa);
+            socks.Listen(100);
+
             // Выделение сокета.
             IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, 13000);
             Socket listener = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -196,11 +210,9 @@ namespace Server_Hub
                     stream.Write(filenames, 0, filenames.Length);
 
                     // Выделение потока для обработки запросов.
-                    Request_Handler RH = new Request_Handler(client);
+                    Request_Handler RH = new Request_Handler(socks);
                     new Thread(RH.Handling).Start();
-
-                    //Завершение цикла.
-                    Console.WriteLine("Main thread: Waiting for a connection... ");
+                    client.Close();
                 }
 
             }
