@@ -11,6 +11,7 @@ using System.Windows.Forms;
 using System.Net.Sockets;
 using System.Net;
 using Messages;
+using System.Threading;
 
 namespace Client
 {
@@ -18,20 +19,22 @@ namespace Client
     {
         string act;
         public static string adress = "192.168.7.102";
+        static Int32 port13 = 13000;
         public static TcpClient clnt;
+        static private string Folder = @"D:\DFS_Client";
+        static public bool receiving;
+
         public Form1()
         {
             InitializeComponent();
         }
-
         
         public static void StartClient(ListView a)
         {
             // Выделение переменных.
             byte[] bytes = new Byte[1024];            
             string checker = "";
-            Int32 port = 13000;
-            clnt = new TcpClient(adress, port);
+            clnt = new TcpClient(adress, port13);
             Byte[] data;
 
             // Выделение потока для получения списка файлов.
@@ -45,6 +48,9 @@ namespace Client
                 // Сткрока для храниения ASCII-варианта ответа.
                 String responseData = String.Empty;
 
+
+                bytes = Encoding.ASCII.GetBytes("1LST");
+                stream.Write(bytes, 0, bytes.Length);
                 while (checker != "End of list")
                 {
                     // Прочесть ответ сервера.
@@ -69,11 +75,32 @@ namespace Client
             }
         }
 
+        public static void StartUploadClient(ListView a)
+        {
+                // Выделение переменных.
+                byte[] bytes = new Byte[1024];
+                clnt = new TcpClient(adress, port13);
+
+                // Выделение потока для получения списка файлов.
+                NetworkStream stream = clnt.GetStream();
+
+            bytes = Encoding.ASCII.GetBytes("0LST");
+            stream.Write(bytes, 0, bytes.Length);
+
+            a.Items.Clear();
+            string[] dirs = Directory.GetFiles(Folder);
+            foreach (string dir in dirs)
+            {
+                ListViewItem item1 = new ListViewItem(Path.GetFileName(dir), 0);
+                a.Items.AddRange(new ListViewItem[] { item1 });
+            }
+        }
 
         private void button1_Click(object sender, EventArgs e)
         {
             StartClient(listView1);
-            button1.Visible = false;
+            panel1.Visible = false;
+            receiving = true;
         }
 
         private void Form1_Load(object sender, EventArgs e)
@@ -101,7 +128,11 @@ namespace Client
         {
             act = listView1.SelectedItems[0].SubItems[0].Text.ToString();
 
-            label1.Text = "Download this file: " + act + "?";
+            if (receiving)
+                label1.Text = "Download this file: " + act + "?";
+            else
+                label1.Text = "Upload this file: " + act + "?";
+
             groupBox1.Visible = true;
         }
 
@@ -116,15 +147,105 @@ namespace Client
         {
             groupBox1.Visible = false;
             label1.Text = "";
-            File_Reciever FR = new File_Reciever();
-            FR.Receiving(act);
+            if (receiving)
+            {
+                File_Reciever FR = new File_Reciever();
+                FR.Receiving(act);
+            }
+            else
+            {
+                File_Sender FS = new File_Sender();
+                FS.Send(act);
+            }
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            StartUploadClient(listView1);
+            panel1.Visible = false;
+            receiving = false;
         }
     }
 
     class File_Sender
-    { }
+    {
+        static Int32 port15 = 15000;
+
+        public File_Sender()
+        { 
+        }
+
+        public void Send(string s)
+        {
+            // Объявление переменных.
+            string checkr = "";
+            byte[] bytes = new byte[1024];
+            byte[] filenames = new byte[1024];
+
+            // Выделение пути к запрашиваемому файлу.
+            string path = Path.Combine(@"D:\DFS_Client", s);
+
+            IPAddress ServAddr = IPAddress.Parse(Form1.adress);
+            TcpClient clnt = new TcpClient(ServAddr.ToString(), port15);
+            // Отправка файла
+            if (File.Exists(path))
+            {
+                // Выделение констант.
+                const int buffersz = 16384;
+                byte[] buffer = new byte[buffersz];
+                int btscpd = 0;
+
+                // Начало передачи.
+                using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (NetworkStream stream = clnt.GetStream())
+                {
+                    bytes = Encoding.ASCII.GetBytes("3"+s);
+                    stream.Write(bytes, 0, bytes.Length);
+                    while (true)
+                    {
+                        Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
+                        checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
+                        if (checkr != "")
+                        {
+                            checkr = "";
+                            break;
+                        }
+                    }
+
+                    do
+                    {
+                        btscpd = inFile.Read(buffer, 0, buffersz);
+                        if (btscpd > 0)
+                        {
+                            // Отправка пакета.
+                            stream.Write(buffer, 0, btscpd);
+
+                            // Получение подтверждения.
+                            while (true)
+                            {
+                                Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
+                                checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
+                                if (checkr != "")
+                                {
+                                    checkr = "";
+                                    break;
+                                }
+                            }
+                        }
+                    } while (btscpd > 0);
+
+                    Thread.Sleep(50);
+                    // Отправка уведомления о конце файла.
+                    filenames = Encoding.ASCII.GetBytes("End of file");
+                    stream.Write(filenames, 0, filenames.Length);
+                }
+
+            }
+        }
+    }
     class File_Reciever
     {
+        static Int32 port15 = 15000;
         public File_Reciever()
         {
         }
@@ -144,8 +265,7 @@ namespace Client
 
             // Выделение сервера
             IPAddress ServAddr = IPAddress.Parse(Form1.adress);
-            Int32 port = 15000;
-            TcpClient clnt = new TcpClient(ServAddr.ToString(), port);
+            TcpClient clnt = new TcpClient(ServAddr.ToString(), port15);
 
 
             // Выделение пути к файлу.
