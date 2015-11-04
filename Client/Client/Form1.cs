@@ -18,7 +18,7 @@ namespace Client
     public partial class Form1 : Form
     {
         string act;
-        public static string adress = "192.168.7.102";
+        public static string adress = "172.20.85.136";
         static Int32 port13 = 13000;
         public static TcpClient clnt;
         static private string Folder = @"D:\DFS_Client";
@@ -121,7 +121,7 @@ namespace Client
 
             // Create columns for the items and subitems.
             // Width of -2 indicates auto-size.
-            listView1.Columns.Add("Name", 130, HorizontalAlignment.Left);
+            listView1.Columns.Add("Name", 1000, HorizontalAlignment.Left);
         }
 
         private void listView1_ItemActivate(object sender, EventArgs e)
@@ -234,7 +234,7 @@ namespace Client
                         }
                     } while (btscpd > 0);
 
-                    Thread.Sleep(50);
+                    //Thread.Sleep(50);
                     // Отправка уведомления о конце файла.
                     filenames = Encoding.ASCII.GetBytes("End of file");
                     stream.Write(filenames, 0, filenames.Length);

@@ -211,109 +211,131 @@ namespace Server_Hub
     }
     class Server
     {
-        static Int32 port_hand = 15000;
-        static Int32 port_rec = 13000;
-        static Int32 port_down = 14000;
-        // Входящие данные от клиента.
-        public static string data = null;
+        static Int16 port = 13000;
+        static string server_destination = @"D:\DFS";
 
-        public static void StartListening()
+        public static void Receive_Message(object income)
         {
+            // Приведение экземпляра класса.
+            Socket client = (Socket)income;
 
+            // Строка для хранения содержимого пакета.
+            string recieved_string;
 
-            // Выделение сокета для обработки запросов.
-            IPEndPoint EndPointa = new IPEndPoint(IPAddress.Any, port_hand);
-            Socket socks = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-            // Начало прослушки.
-            socks.Bind(EndPointa);
-            socks.Listen(100);
-
-            // Выделение сокета для отправки файла.
-            IPEndPoint EndPoint1 = new IPEndPoint(IPAddress.Any, port_rec);
-            Socket listener1 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
+            // Выделение экземпляра класса Message для распознавания ответа.
+            Message mess;
 
             // Буффер входящих сообщений.
             Byte[] bytes = new Byte[1024];
+
+            // Выделение потока для обмена информацией с клиентом.
+            NetworkStream stream = new NetworkStream(client);
+
+            // Ожидание получения сообщения.
+            while (true)
+            {
+                // Считывание массива байт из потока.
+                Int32 bytes_count = stream.Read(bytes, 0, bytes.Length);
+                // Перевод массива байт в строку.
+                recieved_string = Encoding.ASCII.GetString(bytes, 0, bytes_count);
+
+                // !!!Вставить сюда приведение с помощью Message_Handler!!!
+
+                // Проверка типа сообщния.
+                if ()
+                {
+                    new Thread(Send_Message).Start(client);
+                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
+                    Request_Handler RH = new Request_Handler(client, true);
+                    new Thread(RH.Handling).Start();
+                    Console.WriteLine("Waiting for choosing the file...");
+                    break;
+                }
+                else
+                {
+                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилище.
+                    Request_Handler RH = new Request_Handler(client, false);
+                    new Thread(RH.Handling).Start();
+                    Console.WriteLine("Waiting for downloading the file...");
+                    break;
+                }
+            }
+        }
+
+        public static void Send_Message(object income)
+        {
+            // Приведение экземпляра класса.
+            Socket client = (Socket)income;
+
+            // Буффер входящих сообщений.
+            Byte[] bytes = new Byte[1024];
+
+            // Строка содержащая имя файла.
+            string file_name;
+
+            // Строка содержащая ответ клиента.
+            string response;
+
+            // Длина ответа клиента.
+            int response_lenght;
+
+            // Выделение потока для обмена информацией с клиентом.
+            NetworkStream stream = new NetworkStream(client);
+            
+            // Определение файлов в директории.
+            string[] dirs = Directory.GetFiles(server_destination);
+
+            // Отправка информации о каждом файле.
+            for (int q = 0; q < dirs.Length; q++)
+            {
+                FileInfo inf = new FileInfo(dirs[q]);
+                file_name = (Path.GetFileName(dirs[q]));
+                bytes = Encoding.ASCII.GetBytes(file_name);
+                stream.Write(bytes, 0, bytes.Length);
+                Console.WriteLine("Main thread: Sent info of: {0}", file_name);
+                
+                // Ожидание получения подтверждения о приеме информации.
+                while (true)
+                {
+                    response_lenght = stream.Read(bytes, 0, bytes.Length);
+                    response = Encoding.ASCII.GetString(bytes, 0, response_lenght);
+                    if (response != "")
+                    {
+                        response = "";
+                        break;
+                    }
+                }
+            }
+
+            // Отправка отчета о передаче всего списка.
+            bytes = Encoding.ASCII.GetBytes("End of list");
+            stream.Write(bytes, 0, bytes.Length);
+        }
+
+        public static void StartListening()
+        {
+            // Выделение сокета для обработки запросов.
+            IPEndPoint EndPoint = new IPEndPoint(IPAddress.Any, port);
+            Socket socks = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             
             try
             {
                 // Начало прослушки.
-                listener1.Bind(EndPoint1);
-                listener1.Listen(100);
+                socks.Bind(EndPoint);
+                socks.Listen(100);
                 Console.WriteLine("Main thread: Waiting for a connection... ");
-
-                // Объявление переменных.
-                string checkr;
-                byte[] filenames = new byte[1024];
-                string flnme;
-
+                
                 // Ожидание соединения.
                 while (true)
                 {
                     // Потверждение соединения.
-                    Socket client = listener1.Accept();
+                    Socket client = socks.Accept();
                     Console.WriteLine("Main thread: Connected!");
+                    
+                    // Выделение потока для работы с клиентом.
+                    new Thread(Receive_Message).Start(client);
 
-                    // Выделение потока для отправки списка.
-                    NetworkStream stream = new NetworkStream(client);
-
-                    // Узнать что нужно клиенту
-                    while (true)
-                    {
-                        Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                        checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
-                        if (checkr != string.Empty)
-                        {
-                            if (checkr[0] == '1')
-                            {
-                                #region List_of_files
-
-                                // Отправка списка файлов.
-                                string[] dirs = Directory.GetFiles(@"D:\DFS");
-                                for (int q = 0; q < dirs.Length; q++)
-                                {
-                                    FileInfo inf = new FileInfo(dirs[q]);
-                                    flnme = (Path.GetFileName(dirs[q]));
-                                    filenames = Encoding.ASCII.GetBytes(flnme);
-                                    stream.Write(filenames, 0, filenames.Length);
-                                    Console.WriteLine("Main thread: Sent: {0}", flnme);
-                                    while (true)
-                                    {
-                                        bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                                        checkr = Encoding.ASCII.GetString(bytes, 0, bytes_1);
-                                        if (checkr != "")
-                                        {
-                                            checkr = "";
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                // Отправка отчета о передаче всего списка.
-                                filenames = Encoding.ASCII.GetBytes("End of list");
-                                stream.Write(filenames, 0, filenames.Length);
-                                #endregion
-
-                                // Выделение потока для обработки запросов.
-                                Request_Handler RH = new Request_Handler(socks, true);
-                                new Thread(RH.Handling).Start();
-                                client.Close();
-                                break;
-                            }
-
-                            if (checkr[0] == '0')
-                            {
-                                // Выделение потока для обработки запросов.
-                                Request_Handler RH = new Request_Handler(socks, false);
-                                new Thread(RH.Handling).Start();
-                                client.Close();
-                                Console.WriteLine("Waiting for downloading the file...");
-                                break;
-                            }
-                        }
-                    }
+                    Console.WriteLine("Main thread: Waiting for a connection... ");
                 }
 
             }
