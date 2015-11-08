@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace Messages
 {
+    // Стандартное сообщение.
     class Message
     {
         protected string text;
@@ -25,6 +26,7 @@ namespace Messages
         }
     }
 
+    // Сообщение необзодимости загрузки файлов с сервера.
     class Inform_of_Rec_Message : Message
     {
         public Inform_of_Rec_Message(string s) : base(s)
@@ -34,6 +36,7 @@ namespace Messages
         }
     }
 
+    // Сообщение необзодимости загрузки файлов на сервер.
     class Inform_of_Down_Message : Message
     {
         public Inform_of_Down_Message(string s) : base(s)
@@ -43,6 +46,7 @@ namespace Messages
         }
     }
 
+    // Сообщение содержащее часть передаваемого файла.
     class FilePartMessage : Message
     {
         public FilePartMessage(string s, int i) : base(s)
@@ -52,6 +56,7 @@ namespace Messages
         }
     }
 
+    // Сообщение содержащее имя файла.
     class RequestMessage : Message
     {
         public RequestMessage(string s, int i) : base(s)
@@ -61,12 +66,36 @@ namespace Messages
         }
     }
 
+    // Сообщение содержащее элемент списка файлов.
     class ListMessage : Message
     {
         public ListMessage(string s, int i) : base(s)
         {
             text = s;
             type = 2;
+        }
+    }
+
+    // Обработчик сообщений.
+    class Message_Handler
+    {
+        public Message_Handler()
+        {
+
+        }
+
+        // Получить пакет.
+        public byte[] Encrypt(Message m)
+        {
+            byte[] bytes = new byte[1024];
+            return bytes;
+        }
+
+        // Раскрыть пакет.
+        public Message Decrypt(byte[] bytes)
+        {
+            Message m = null;
+            return m;
         }
     }
 }
