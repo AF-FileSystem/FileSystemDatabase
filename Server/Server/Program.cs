@@ -190,7 +190,7 @@ namespace Server_Hub
             flname = n;
         }
 
-        // Протокол поучения файла.
+        // Протокол получения файла.
         public void Receiving()
         {
             // Буффер входящих данных.
@@ -234,6 +234,7 @@ namespace Server_Hub
             }
         }
 
+        // Протокол отправки файла.
         public void Sending()
         {
             // Строка для хранения необработанного ответа.
@@ -317,6 +318,7 @@ namespace Server_Hub
         // Путь к файлам сервера.
         static string server_destination = @"D:\DFS";
 
+        // Протокол обработки сообщения.
         public static void Receive_Message(object income)
         {
             // Получение сокета для общения с клиентом.
@@ -361,6 +363,7 @@ namespace Server_Hub
             }
         }
 
+        // Протокол отправки сообщения.
         public static void Send_Message(object income)
         {
             // Приведение экземпляра класса.
@@ -405,6 +408,7 @@ namespace Server_Hub
             stream.Write(bytes, 0, bytes.Length);
         }
 
+        // Протокол обработки подключений.
         public static void StartListening()
         {
             // Выделение сокета для обработки запросов.
