@@ -22,18 +22,89 @@ namespace Server_Hub
     {
         Socket listener;
         TcpClient cli;
-        bool receiving;
+        //bool receiving;
         public Request_Handler()
         {
         }
 
-        public Request_Handler(Socket c, bool b)
+        public Request_Handler(Socket c/*, bool b*/)
         {
             this.listener = c;
-            receiving = b;
+            //receiving = b;
         }
 
-        public void Handling()
+        public void Handle_Send()
+        {
+            string flnme = "";
+            Byte[] data = new Byte[256];
+            while (true) {
+                Socket client = listener.Accept();
+                Stream stream = new NetworkStream(client);
+                // Цикл ожидания ответа.
+                while (flnme == "") {
+                    // Прочесть запрос клиента.
+                    Int32 bytes_1 = stream.Read(data, 0, data.Length);
+                    flnme = Encoding.ASCII.GetString(data, 0, bytes_1);
+                }
+
+                // Отчет о начале передачи.
+                Console.WriteLine("Handling thread: Start sending protocol for " + flnme);
+
+                // Запуск передачи файла.
+                File_Translator FT = new File_Translator(client, flnme);
+                Thread h = new Thread(FT.Sending);
+                h.Start();
+                h.Join();
+                h.Abort();
+                flnme = "";
+            }
+        }
+
+        public void Handle_Recieve()
+        {
+
+            Console.WriteLine("Main thread: Waiting for a connection... ");
+            // Объявление переменных.
+            byte[] bytes = new byte[1024];
+            byte[] filenames = new byte[1024];
+            string flnme = "";
+            while (true)                
+            {
+                Socket client = listener.Accept();
+                Stream stream = new NetworkStream(client);
+                flnme = Receive_Message(stream);
+                // Отчет о начале передачи.
+                Console.WriteLine("Handling thread: Start receiving protocol for " + flnme);
+
+                // Запуск передачи файла.
+                File_Translator FT = new File_Translator(client, flnme);
+                Thread h = new Thread(FT.Receiving);
+                h.Start();
+                h.Join();
+                h.Abort();
+                flnme = "";
+            }
+        }
+
+        public string Receive_Message(Stream stream)
+        {
+            // Буффер для получения ответа.
+            Byte[] data = new Byte[256];
+            string flnme = "";
+
+            while (flnme == "") {
+                // Прочесть запрос клиента.
+                Int32 bytes_1 = stream.Read(data, 0, data.Length);
+                string assis = Encoding.ASCII.GetString(data, 0, bytes_1);
+                if (assis[0] == '3') {
+                    flnme = assis.Remove(0, 1);
+                    stream.Write(data, 0, data.Length);
+                }
+            }
+            return flnme;
+        }
+
+       /* public void Handling()
         {
             // Объявление переменных.
             byte[] bytes = new byte[1024];
@@ -104,7 +175,7 @@ namespace Server_Hub
                     flnme = "";
                 }
             }
-        }
+        }*/
     }
     class File_Translator
     {
@@ -246,16 +317,16 @@ namespace Server_Hub
                 {
                     new Thread(Send_Message).Start(client);
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
-                    Request_Handler RH = new Request_Handler(client, true);
-                    new Thread(RH.Handling).Start();
+                    Request_Handler RH = new Request_Handler(client);
+                    new Thread(RH.Handle_Send).Start();
                     Console.WriteLine("Waiting for choosing the file...");
                     break;
                 }
                 else
                 {
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилище.
-                    Request_Handler RH = new Request_Handler(client, false);
-                    new Thread(RH.Handling).Start();
+                    Request_Handler RH = new Request_Handler(client);
+                    new Thread(RH.Handle_Recieve).Start();
                     Console.WriteLine("Waiting for downloading the file...");
                     break;
                 }
