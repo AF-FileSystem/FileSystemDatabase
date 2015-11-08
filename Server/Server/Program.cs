@@ -298,6 +298,7 @@ namespace Server_Hub
             }
             else
             {
+                // Выделение потока для отправки сообщения.
                 using (NetworkStream stream = new NetworkStream(client))
                 {
                     // !!!Встасить увделомление об отсутствии запрашиваемого файла!!!                
