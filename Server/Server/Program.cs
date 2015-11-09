@@ -16,6 +16,10 @@ namespace Server_Hub
         Socket client;
         // Поток для общения с клиентом.
         Stream stream;
+        // Сообщение для коммуникации с клиентом.
+        Message Mes;
+        // Обработчик сообщений.
+        Message_Handler Mes_Hand = new Message_Handler();
         
         public Request_Handler(Socket c)
         {
@@ -28,34 +32,33 @@ namespace Server_Hub
         // Протокол обработки запроса на отправку файла.
         public void Handle_Send()
         {
-            // Строка для ранения имени файла.
-            string flnme = "";
             // Массив для считывания ответа из потока.
             Byte[] data = new Byte[256];
+            // Сообщение для имени файла.
+            Mes = new RequestMessage(string.Empty);
 
             // Цикл ожидания ответа.
             while (true)
             {
-                while (flnme == "")
+                while (Mes.Get_Data() == string.Empty)
                 {
                     // Прочесть запрос клиента.
                     Int32 bytes_1 = stream.Read(data, 0, data.Length);
-                    string assis = Encoding.ASCII.GetString(data, 0, bytes_1);
-                    // !!!Переделать обработку полученного сообщения используя Message_Handler!!!
+                    Mes = (RequestMessage)Mes_Hand.Decrypt(data);
                 }
 
                 // Отчет о начале передачи.
-                Console.WriteLine("Handling thread: Start sending protocol for " + flnme);
+                Console.WriteLine("Handling thread: Start sending protocol for " + Mes.Get_Data());
 
                 // Запуск передачи файла.
-                File_Translator FT = new File_Translator(client, flnme);
+                File_Translator FT = new File_Translator(client, Mes.Get_Data());
                 Thread h = new Thread(FT.Sending);
                 h.Start();
 
                 // Ожидание конца передачи файла.
                 h.Join();
                 h.Abort();
-                flnme = "";
+                Mes = new Message();
             }
         }
 
@@ -91,19 +94,18 @@ namespace Server_Hub
             // Буффер для получения ответа.
             Byte[] data = new Byte[256];
             // Строка для хранения имени запрашиваемого файла.
-            string flnme = "";
+            Mes = new RequestMessage(string.Empty);
 
-            while (flnme == "")
+            while (Mes.Get_Data() == string.Empty)
             {
                 // Прочесть запрос клиента.
                 Int32 bytes_1 = stream.Read(data, 0, data.Length);
-                string assis = Encoding.ASCII.GetString(data, 0, bytes_1);
-                // !!!Обработка с помощью Message_Handler!!!
+                Mes = Mes_Hand.Decrypt(data);
             }
-            return flnme;
+            return Mes.Get_Data();
         }
 
-
+        // Старый метод.
         /* public void Handling()
          {
              // Объявление переменных.
@@ -181,6 +183,10 @@ namespace Server_Hub
         Socket client;
         // Имя обрабатываемого файла.
         string flname;
+        // Сообщение для коммуникации с клиентом.
+        Message mes;
+        // Обработчик сообщений.
+        Message_Handler Mes_Hand = new Message_Handler();
 
         public File_Translator(Socket c, string n)
         {
@@ -198,14 +204,13 @@ namespace Server_Hub
 
             // Страка для хранения обработанного ответа.
             string decrypted = string.Empty;
-            // Страка для хранения необработанного ответа.
-            string assist = string.Empty;
             // Количество полученных байт.
             Int32 bytes_count;
             // Буффер для хранения сообщения клиента.
             byte[] pack = new byte[1024];
             // Буффер для получения ответа.
             pack = new Byte[256];
+            Message response = new ResponseMessage(string.Empty);
 
 
             // Выделение пути к файлу.
@@ -219,17 +224,20 @@ namespace Server_Hub
 
                     // Прочесть ответ сервера.
                     bytes_count = stream.Read(pack, 0, pack.Length);
-                    assist = Encoding.ASCII.GetString(pack, 0, bytes_count);
-
-                    // !!!Обработать с помощью Message_Handler!!!
-                    if (decrypted != "End of file")
+                    // Обработка данных.
+                    mes = new FilePartMessage(Mes_Hand.Decrypt(pack).Get_Data());
+                    
+                    if (mes.Get_Data()!= "End of file")
                     {
                         // Запись в файл.
                         outFile.Write(pack, 0, bytes_count);
-                        // !!!Отправка отчета!!!
-                        // stream.Write(pack, 0, pack.Length);
+
+                        // Отправка уведомления клиенту.
+                        stream.Write(Mes_Hand.Encrypt(response), 0, Mes_Hand.Encrypt(response).Length);
                     }
-                } while (decrypted != "End of file");
+                } while (mes.Get_Data() != "End of file");
+
+                // Уведомление об окончании операции.
                 Console.WriteLine("Downloading is complete!");
             }
         }
@@ -253,6 +261,10 @@ namespace Server_Hub
             int btscpd = 0;
             // Строка для отправки уведомлений.
             byte[] message = new byte[1024];
+            // Сообщение для коммуникации с клиентом.
+            Message file_part = new FilePartMessage(string.Empty);
+            // Сообщение для обработки подтверждения.
+            Message response = new ResponseMessage(string.Empty);
 
             // Выделение пути к запрашиваемому файлу.
             string path = Path.Combine(@"D:\DFS", flname);
@@ -268,28 +280,32 @@ namespace Server_Hub
                     {
                         // Считывание данных из файла.
                         btscpd = inFile.Read(buffer, 0, buffersz);
+                        file_part = Mes_Hand.Decrypt(buffer);
+
                         // Проверка на наличие неотправленных данных.
                         if (btscpd > 0)
                         {
                             // Отправка пакета.
-                            stream.Write(buffer, 0, btscpd);
+                            stream.Write(Mes_Hand.Encrypt(file_part), 0, btscpd);
 
                             // Получение подтверждения.
                             while (true)
                             {
                                 // Считываение данных из потока.
                                 bytes_count = stream.Read(bytes, 0, bytes.Length);
-                                assis = Encoding.ASCII.GetString(bytes, 0, bytes_count);
-
-                                // !!!Обработка Message_Handler и проверка подтверждения!!!
-
+                                response = new ResponseMessage(Mes_Hand.Decrypt(bytes).Get_Data());
+                                if (response.Get_Data()!=string.Empty)
+                                {
+                                    response = new ResponseMessage(string.Empty);
+                                    break;
+                                }
                             }
                         }
                     } while (btscpd > 0);
 
                     // Отправка уведомления о конце файла.
-                    message = Encoding.ASCII.GetBytes("End of file");
-                    stream.Write(message, 0, message.Length);
+                    file_part = new FilePartMessage("End of file");
+                    stream.Write(Mes_Hand.Encrypt(file_part), 0, Mes_Hand.Encrypt(file_part).Length);
 
                     // Уведомление о завершении процесса.
                     Console.WriteLine("Translation thread: File has been sent.");
@@ -302,8 +318,8 @@ namespace Server_Hub
                 using (NetworkStream stream = new NetworkStream(client))
                 {
                     // !!!Встасить увделомление об отсутствии запрашиваемого файла!!!                
-                    message = Encoding.ASCII.GetBytes("File has not been found.");
-                    stream.Write(message, 0, message.Length);
+                    ErrorMessage Err = new ErrorMessage(string.Empty);
+                    stream.Write(Mes_Hand.Encrypt(Err), 0, Mes_Hand.Encrypt(Err).Length);
                 }
             }
 
@@ -318,14 +334,14 @@ namespace Server_Hub
         static Int16 port = 13000;
         // Путь к файлам сервера.
         static string server_destination = @"D:\DFS";
+        // Обработчик сообщений.
+        static Message_Handler Mes_Hand = new Message_Handler();
 
         // Протокол обработки сообщения.
         public static void Receive_Message(object income)
         {
             // Получение сокета для общения с клиентом.
             Socket client = (Socket)income;
-            // Строка для хранения содержимого пакета.
-            string recieved_string;
             // Выделение экземпляра класса Message для распознавания ответа.
             Message mess;
             // Буффер входящих сообщений.
@@ -338,15 +354,15 @@ namespace Server_Hub
             {
                 // Считывание массива байт из потока.
                 Int32 bytes_count = stream.Read(bytes, 0, bytes.Length);
-                // Перевод массива байт в строку.
-                recieved_string = Encoding.ASCII.GetString(bytes, 0, bytes_count);
-
-                // !!!Вставить сюда приведение с помощью Message_Handler!!!
-
+                // Обработка сообщения.
+                mess = Mes_Hand.Decrypt(bytes);
+                
                 // Проверка типа сообщния.
-                if ()
+                if (mess.Get_Type()==1)
                 {
+                    // Отправка списка файлов.
                     Send_Message(client);
+
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
                     Request_Handler RH = new Request_Handler(client);
                     new Thread(RH.Handle_Send).Start();
@@ -373,39 +389,52 @@ namespace Server_Hub
             Byte[] bytes = new Byte[1024];
             // Строка содержащая имя файла.
             string file_name;
-            // Строка содержащая ответ клиента.
-            string response;
             // Длина ответа клиента.
             int response_lenght;
             // Выделение потока для обмена информацией с клиентом.
             NetworkStream stream = new NetworkStream(client);
             // Определение файлов в директории.
             string[] dirs = Directory.GetFiles(server_destination);
+            // Сообщение полученное от клиента.
+            Message M;
 
             // Отправка информации о каждом файле.
             for (int q = 0; q < dirs.Length; q++)
             {
+                // Подготовка информации о файле.
                 FileInfo inf = new FileInfo(dirs[q]);
+                // Строка хранящая имя файла.
                 file_name = (Path.GetFileName(dirs[q]));
-                bytes = Encoding.ASCII.GetBytes(file_name);
+                // Создание сообщения.
+                ListMessage LM = new ListMessage(file_name);
+                // Кодировка
+                bytes = Mes_Hand.Encrypt(LM);
+                // Отправка сообщения.
                 stream.Write(bytes, 0, bytes.Length);
+                // Уведомление об успешной отправке.
                 Console.WriteLine("Main thread: Sent info of: {0}", file_name);
 
                 // Ожидание получения подтверждения о приеме информации.
                 while (true)
                 {
+                    // Получение данных.
                     response_lenght = stream.Read(bytes, 0, bytes.Length);
-                    response = Encoding.ASCII.GetString(bytes, 0, response_lenght);
-                    if (response != "")
+                    // Расшифровка сообщения.
+                    M = Mes_Hand.Decrypt(bytes);
+
+                    // Проверка на пустоту.
+                    if (M.Get_Data() != "")
                     {
-                        response = "";
                         break;
                     }
                 }
             }
 
+            // Формирование отчета о завершении.
+            M = new EndMessage("");
+            bytes = Mes_Hand.Encrypt(M);
+
             // Отправка отчета о передаче всего списка.
-            bytes = Encoding.ASCII.GetBytes("End of list");
             stream.Write(bytes, 0, bytes.Length);
         }
 

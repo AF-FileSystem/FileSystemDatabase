@@ -28,6 +28,7 @@ namespace Client
         static private string Folder = @"D:\DFS_Client";
         // Маркер для определения типа запросов.
         static public bool receiving;
+        Message_Handler M = new Message_Handler();        
 
         public Form1()
         {
