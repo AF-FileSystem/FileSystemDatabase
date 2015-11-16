@@ -8,7 +8,7 @@ namespace Messages
 {
 
     // Обработчик сообщений.
-    public class Message_Handler
+    public class Message_Handler <T>
     {
         public Message_Handler()
         {
@@ -32,10 +32,8 @@ namespace Messages
         }
 
         // Раскрыть пакет.
-        public Message Decrypt(byte[] bytes)
+        public T Decrypt<T>(byte[] bytes) where T: Message
         {
-            Message m = null;
-
             return m;
         }
     }

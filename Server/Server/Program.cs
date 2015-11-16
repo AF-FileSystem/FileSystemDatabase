@@ -34,17 +34,15 @@ namespace Server_Hub
         {
             // Массив для считывания ответа из потока.
             Byte[] data = new Byte[256];
-            // Сообщение для имени файла.
-            Mes = new RequestMessage(string.Empty);
+            // Строка для имени файла.
+            string name = string.Empty;
 
             // Цикл ожидания ответа.
             while (true)
             {
-                while (Mes.Get_Data() == string.Empty)
+                while (name == string.Empty)
                 {
-                    // Прочесть запрос клиента.
-                    Int32 bytes_1 = stream.Read(data, 0, data.Length);
-                    Mes = (RequestMessage)Mes_Hand.Decrypt(data);
+                    name = Receive_Message(stream);
                 }
 
                 // Отчет о начале передачи.
@@ -64,6 +62,7 @@ namespace Server_Hub
 
         // Протокол обработки запроса на получение файла.
         public void Handle_Recieve()
+
         {
             // Строка для хранения имени запрашиваемого файла.
             string flnme = "";
@@ -208,8 +207,7 @@ namespace Server_Hub
             Int32 bytes_count;
             // Буффер для хранения сообщения клиента.
             byte[] pack = new byte[1024];
-            // Буффер для получения ответа.
-            pack = new Byte[256];
+
             Message response = new ResponseMessage(string.Empty);
 
 
@@ -226,7 +224,7 @@ namespace Server_Hub
                     bytes_count = stream.Read(pack, 0, pack.Length);
                     // Обработка данных.
                     mes = new FilePartMessage(Mes_Hand.Decrypt(pack).Get_Data());
-                    
+
                     if (mes.Get_Data()!= "End of file")
                     {
                         // Запись в файл.
@@ -286,14 +284,13 @@ namespace Server_Hub
                         if (btscpd > 0)
                         {
                             // Отправка пакета.
-                            stream.Write(Mes_Hand.Encrypt(file_part), 0, btscpd);
+                            stream.Write(Mes_Hand.Encrypt(file_part), 0, Mes_Hand.Encrypt(file_part).Length);
 
                             // Получение подтверждения.
                             while (true)
                             {
-                                // Считываение данных из потока.
-                                bytes_count = stream.Read(bytes, 0, bytes.Length);
-                                response = new ResponseMessage(Mes_Hand.Decrypt(bytes).Get_Data());
+                                response = Recieve_Message(stream);
+
                                 if (response.Get_Data()!=string.Empty)
                                 {
                                     response = new ResponseMessage(string.Empty);
@@ -325,6 +322,21 @@ namespace Server_Hub
 
         }
 
+        public Message Recieve_Message(NetworkStream stream)
+        {
+            // Количество полученных байт.
+            Int32 bytes_count;
+            // Буффер для хранения сообщения клиента.
+            byte[] pack = new byte[1024];
+            // Возвращаемое сообщение.
+            ResponseMessage response;
+
+            // Считываение данных из потока.
+            bytes_count = stream.Read(pack, 0, pack.Length);
+            response = new ResponseMessage(Mes_Hand.Decrypt(pack).Get_Data());
+            return response;
+        }
+
     }
 
     // Главное тело сервера. Обработка подключений.
@@ -337,31 +349,26 @@ namespace Server_Hub
         // Обработчик сообщений.
         static Message_Handler Mes_Hand = new Message_Handler();
 
-        // Протокол обработки сообщения.
-        public static void Receive_Message(object income)
+        // Работа с подключением.
+        public static void Working_With(object income)
         {
             // Получение сокета для общения с клиентом.
             Socket client = (Socket)income;
             // Выделение экземпляра класса Message для распознавания ответа.
             Message mess;
-            // Буффер входящих сообщений.
-            Byte[] bytes = new Byte[1024];
             // Выделение потока для обмена информацией с клиентом.
             NetworkStream stream = new NetworkStream(client);
 
             // Ожидание получения сообщения.
             while (true)
             {
-                // Считывание массива байт из потока.
-                Int32 bytes_count = stream.Read(bytes, 0, bytes.Length);
-                // Обработка сообщения.
-                mess = Mes_Hand.Decrypt(bytes);
+                mess = Recieve_Message(stream);
                 
                 // Проверка типа сообщния.
                 if (mess.Get_Type()==1)
                 {
                     // Отправка списка файлов.
-                    Send_Message(client);
+                    Send_Message(stream);
 
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
                     Request_Handler RH = new Request_Handler(client);
@@ -383,8 +390,6 @@ namespace Server_Hub
         // Протокол отправки сообщения.
         public static void Send_Message(object income)
         {
-            // Приведение экземпляра класса.
-            Socket client = (Socket)income;
             // Буффер входящих сообщений.
             Byte[] bytes = new Byte[1024];
             // Строка содержащая имя файла.
@@ -392,7 +397,7 @@ namespace Server_Hub
             // Длина ответа клиента.
             int response_lenght;
             // Выделение потока для обмена информацией с клиентом.
-            NetworkStream stream = new NetworkStream(client);
+            NetworkStream stream = (NetworkStream)income;
             // Определение файлов в директории.
             string[] dirs = Directory.GetFiles(server_destination);
             // Сообщение полученное от клиента.
@@ -431,11 +436,29 @@ namespace Server_Hub
             }
 
             // Формирование отчета о завершении.
-            M = new EndMessage("");
+            M = new EndMessage("End of list");
             bytes = Mes_Hand.Encrypt(M);
 
             // Отправка отчета о передаче всего списка.
             stream.Write(bytes, 0, bytes.Length);
+        }
+
+        // Протокол обработки сообщения.
+        public static Message Recieve_Message(object income)
+        {
+            // Получение сокета для общения с клиентом.
+            Stream client = (Stream)income;
+            // Выделение экземпляра класса Message для распознавания ответа.
+            Message mess;
+            // Буффер входящих сообщений.
+            Byte[] bytes = new Byte[1024];
+
+            // Считывание массива байт из потока.
+            Int32 bytes_count = client.Read(bytes, 0, bytes.Length);
+            // Обработка сообщения.
+            mess = Mes_Hand.Decrypt(bytes);
+
+            return mess;
         }
 
         // Протокол обработки подключений.
@@ -460,7 +483,7 @@ namespace Server_Hub
                     Console.WriteLine("Main thread: Connected!");
 
                     // Выделение потока для работы с клиентом.
-                    new Thread(Receive_Message).Start(client);
+                    new Thread(Working_With).Start(client);
 
                     Console.WriteLine("Main thread: Waiting for a connection... ");
                 }
