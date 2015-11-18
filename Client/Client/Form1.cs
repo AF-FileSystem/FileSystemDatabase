@@ -29,7 +29,9 @@ namespace Client
         // Маркер для определения типа запросов.
         static public bool receiving;
         // Обработчик сообщений.
-        static Message_Handler M = new Message_Handler();        
+        static Message_Handler M = new Message_Handler();
+        // Отвечает за отправку/получение сообщений.
+        static NetWorking NW = new NetWorking();
 
         public Form1()
         {
@@ -51,29 +53,28 @@ namespace Client
             NetworkStream stream = clnt.GetStream();
             // Сообщение о типе клиента.
             Inform_of_Rec_Message mes = new Inform_of_Rec_Message(string.Empty);
-            // Сообщение о типе клиента.
-            ListMessage LM = new ListMessage(string.Empty);
+            // Сообщение c именем файла из списка.
+            Messages.Message LM = new ListMessage(string.Empty);
 
             try
             {
                 // Оправка уведомления о типе клиента.
-                stream.Write(M.Encrypt(mes), 0, M.Encrypt(mes).Length);
+                NW.Send(mes, stream);
 
                 // Получение списка файлов.
-                while (LM.Get_Data() != "End of list")
+                while (!(LM is EndMessage))
                 {
                     // Прочесть ответ сервера.
-                    Int32 bytes_1 = stream.Read(data, 0, data.Length);
-                    LM = Recieve_L_mes(stream);
+                    LM = NW.Recieve(stream);
 
                     // Проверить является ли ответ именем файла.
-                    if (LM.Get_Data() != "End of list")
+                    if (!(LM is EndMessage))
                     {
                         // Добавление файла в список.
                         a.Items.Add(LM.Get_Data());
 
                         // Отослать назад уведомление.
-                        stream.Write(M.Encrypt(LM), 0, M.Encrypt(LM).Length);
+                        NW.Send(LM, stream);
                     }
                 }
 
@@ -93,11 +94,9 @@ namespace Client
             NetworkStream stream = clnt.GetStream();
             // Сообщение о типе клиента.
             Inform_of_Down_Message mes = new Inform_of_Down_Message(string.Empty);
-            // Сообщение о типе клиента.
-            ListMessage LM = new ListMessage(string.Empty);
             
             // Оправка уведомления о типе клиента.
-            stream.Write(M.Encrypt(mes), 0, M.Encrypt(mes).Length);
+            NW.Send(mes, stream);
 
             // Представление файлов клиента в виде списка.
             a.Items.Clear();
@@ -107,25 +106,6 @@ namespace Client
                 ListViewItem item1 = new ListViewItem(Path.GetFileName(dir), 0);
                 a.Items.AddRange(new ListViewItem[] { item1 });
             }
-        }
-
-        // Обработка входящего сообщения
-        public static Messages.ListMessage Recieve_L_mes(NetworkStream stream)
-        {
-            // Буффер входящих данных.
-            byte[] bytes = new Byte[1024];
-
-            // Возвращаемое сообщение.
-            ListMessage mess = new ListMessage(string.Empty);
-
-            // Проверка получения ответа.
-            while (mess.Get_Data() == string.Empty)
-            {
-                // Считвание ответа.
-                Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                mess = (ListMessage)M.Decrypt(bytes);
-            }
-            return mess;
         }
 
         // Перевод клиента в режим скачивания файлов с сервера.
@@ -207,7 +187,7 @@ namespace Client
         }
     }
 
-    //Часть клиента, ответственная за отправку файлов.
+    // Часть клиента, ответственная за отправку файлов.
     class File_Sender
     {
         // Путь к файлам клиента.
@@ -218,46 +198,23 @@ namespace Client
         byte[] bytes = new byte[1024];
         // Обработчик сообщений.
         Message_Handler Mes_Hand = new Message_Handler();
+        // Отвечает за отправку/получение сообщений.
+        NetWorking NW = new NetWorking();
 
         public File_Sender(TcpClient c)
         {
             clnt = c;
         }
-
-        // Отправка сообщения.
-        public void Send_Name(string s, NetworkStream stream)
-        {
-            // Создание сообщения содержащего имя файла.
-            Messages.RequestMessage name = new RequestMessage(s);
-
-            // Отправка части файла.
-            stream.Write(Mes_Hand.Encrypt(name), 0, Mes_Hand.Encrypt(name).Length);
-        }
-
-        // Получение ответа.
-        public Messages.Message Recieve_resp(NetworkStream stream)
-        {
-            // Сообщение для хранения ответа.
-            Messages.Message mess = new RequestMessage(string.Empty);
-
-            // Проверка получения ответа.
-            while (mess.Get_Data() == string.Empty)
-            {
-                // Считвание ответа.
-                Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                mess = Mes_Hand.Decrypt(bytes);
-
-            }
-            return mess;
-        }
-
+        
         // Отправка файла.
         public void Send_File(string s)
         {
             // Сообщение содержащее часть файла.
-            FilePartMessage mes;
+            Messages.Message mes;
+            // Сообщение содержащее имя файла.
+            RequestMessage name;
             // Сообщение содержащее подтверждение получения.
-            Messages.Message resp;
+            Messages.Message resp = new ResponseMessage(string.Empty);
             // Размер буффера считываемых данных.
             const int buffersz = 16384;
             // Буффер для частей файла.
@@ -275,11 +232,17 @@ namespace Client
                 using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (NetworkStream stream = clnt.GetStream())
                 {
+                    name = new RequestMessage(s);
+
                     // Отправка имени файла.
-                    Send_Name(s, stream);
+                    NW.Send(name, stream);
 
                     // Ожидание ответа.
-                    Recieve_resp(stream);
+                    do
+                    {
+                        resp = NW.Recieve(stream);
+                    }
+                    while (resp.Get_Data() == string.Empty);
 
                     do
                     {
@@ -288,14 +251,14 @@ namespace Client
                         // Проверка на пустоту считанных данных.
                         if (btscpd > 0)
                         {
-                            mes = (FilePartMessage)Mes_Hand.Decrypt(buffer);
+                            mes = new FilePartMessage(Encoding.ASCII.GetString(buffer));
                             // Отправка пакета.
-                            stream.Write(Mes_Hand.Encrypt(mes), 0, Mes_Hand.Encrypt(mes).Length);
+                            NW.Send(mes, stream);
 
                             // Получение подтверждения.
                             while (true)
                             {
-                                resp = Recieve_resp(stream);
+                                resp = NW.Recieve(stream);
 
                                 if (resp.Get_Data() != "")
                                 {
@@ -310,8 +273,8 @@ namespace Client
                     Thread.Sleep(50);
 
                     // Отправка уведомления о конце файла.
-                    mes = new FilePartMessage("End of file");
-                    stream.Write(Mes_Hand.Encrypt(mes), 0, Mes_Hand.Encrypt(mes).Length);
+                    mes = new EndMessage("End of file");
+                    NW.Send(mes, stream);
                 }
 
             }
@@ -319,15 +282,14 @@ namespace Client
             {
                 using (NetworkStream stream = clnt.GetStream())
                 {
-                    // !!!Отправить серверу сообщение об отсутствии файла!!!
-                    buffer = Encoding.ASCII.GetBytes("File is not exsiting");
-                    stream.Write(buffer, 0, buffer.Length);
+                    mes = new ErrorMessage("File is not exsiting");
+                    NW.Send(mes, stream);
                 }
             }
         }
     }
 
-    //Часть клиента, ответственная за скачивание файлов.
+    // Часть клиента, ответственная за скачивание файлов.
     class File_Reciever
     {
         // Тср-клиент для коммуникации с сервером.
@@ -338,45 +300,23 @@ namespace Client
         byte[] bytes = new Byte[1024];
         // Обработчик сообщений.
         Message_Handler Mes_Hand = new Message_Handler();
+        // Отвечает за получени и отправку собщенийю
+        NetWorking NW = new NetWorking();
 
         public File_Reciever(TcpClient c)
         {
             clnt = c;
         }
-
-        // Отправка сообщения.
-        public void Send_Name(string s, NetworkStream stream)
-        {
-            // Создание сообщения содержащего имя файла.
-            Messages.RequestMessage name = new RequestMessage(s);
-
-            // Отправка части файла.
-            stream.Write(Mes_Hand.Encrypt(name), 0, Mes_Hand.Encrypt(name).Length);
-        } 
-
-        // Получение ответа.
-        public Messages.Message Recieve_resp(NetworkStream stream)
-        {
-            // Возвращаемое сообщение.
-            Messages.Message mess = new Messages.Message(string.Empty);
-
-            // Проверка получения ответа.
-            while (mess.Get_Data() == string.Empty)
-            {
-                // Считвание ответа.
-                Int32 bytes_1 = stream.Read(bytes, 0, bytes.Length);
-                mess = Mes_Hand.Decrypt(bytes);
-            }
-            return mess;
-        }
-
+        
         // Протокол получения файла.
         public void Receiving(string s)
         {
             // Обработанное входящее сообщение.
             Messages.Message mess;
-            // Обработанное входящее сообщение.
-            Messages.ResponseMessage response = new ResponseMessage(string.Empty);
+            // Сообщение содержащее имя.
+            RequestMessage name;
+            // Уведомительное сообщение.
+            ResponseMessage response = new ResponseMessage(string.Empty);
             // Буффер для получения ответа.
             byte[] pack = new byte[1024];
 
@@ -387,27 +327,60 @@ namespace Client
             using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
             using (NetworkStream stream = clnt.GetStream())
             {
+                name = new RequestMessage(s);
                 // Отправка имени.
-                Send_Name(s, stream);
+                NW.Send(name, stream);
                 do
                 {
                     // Получение части файла.
-                    mess = Recieve_resp(stream);
+                    mess = NW.Recieve(stream);
 
                     // Проверка на завершение скачивания.
-                    if (mess.Get_Data() != "End of file")
+                    if (!(mess is EndMessage))
                     {
                         // Запись в файл.
-                        outFile.Write(pack, 0, pack.Length);
+                        outFile.Write(mess.Get_Info(), 0, mess.Get_Info().Length);
                         // Отправка уведомления.
-                        stream.Write(Mes_Hand.Encrypt(response), 0, Mes_Hand.Encrypt(response).Length);
+                        NW.Send(response, stream);
                     }
 
-                } while (mess.Get_Data()!= "End of file");
+                } while (!(mess is EndMessage));
 
                 // Отчет об успешном скачивании.
                 MessageBox.Show("Downloading is complete!", "Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+        }
+    }
+
+    // Отвечает за передачу сообщений.
+    public class NetWorking
+    {
+        // Обработчик сообщений.
+        Message_Handler Mes_Hand = new Message_Handler();
+
+        // Отправка сообщения.
+        public void Send(Messages.Message m, NetworkStream ns)
+        {
+            // Отправка сообщения.
+            ns.Write(Mes_Hand.Encrypt(m), 0, Mes_Hand.Encrypt(m).Length);
+        }
+
+        // Пoлучение сообщения.
+        public Messages.Message Recieve(NetworkStream ns)
+        {
+            // Буффер для получения ответа.
+            Byte[] data = new Byte[1024];
+            // Полученное сообщение.
+            Messages.Message mes;
+
+            do
+            {
+                // Прочесть запрос клиента.
+                Int32 bytes_1 = ns.Read(data, 0, data.Length);
+                mes = Mes_Hand.Decrypt(data);
+            }
+            while (mes.Get_Data() == string.Empty);
+            return mes;
         }
     }
 }
