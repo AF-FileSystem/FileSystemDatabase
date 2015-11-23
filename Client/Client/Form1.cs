@@ -41,6 +41,7 @@ namespace Client
         // Режим скачивания файла.
         public static void StartClient(ListView a)
         {
+            a.Items.Clear();
             // Выделение переменных.
             byte[] bytes = new Byte[1024];
             // Строка для хранения входящих сообщений.
@@ -88,6 +89,7 @@ namespace Client
         // Режим отправки файла.
         public static void StartUploadClient(ListView a)
         {
+            a.Items.Clear();
             // Выделение переменных.
             byte[] bytes = new Byte[1024];
             // Выделение потока для получения списка файлов.
@@ -169,12 +171,16 @@ namespace Client
                 // Запуск протокола скачивания файла.
                 File_Reciever FR = new File_Reciever(clnt);
                 FR.Receiving(act);
+                clnt = new TcpClient(adress, 13000);
+                StartClient(listView1);
             }
             else
             {
                 // Запуск протокола отправки файла.
                 File_Sender FS = new File_Sender(clnt);
                 FS.Send_File(act);
+                clnt = new TcpClient(adress, 13000);
+                StartUploadClient(listView1);
             }
         }
 
@@ -184,6 +190,13 @@ namespace Client
             StartUploadClient(listView1);
             panel1.Visible = false;
             receiving = false;
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            ErrorMessage er = new ErrorMessage("LOL");
+            NW.Send(er, clnt.GetStream());
+            Thread.Sleep(5000);
         }
     }
 

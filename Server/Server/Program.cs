@@ -36,15 +36,21 @@ namespace Server_Hub
             Byte[] data = new Byte[256];
             // Строка для имени файла.
             string name = string.Empty;
+            Message mes = new Message(string.Empty);
 
             // Цикл ожидания ответа.
             while (true)
             {
-                while (name == string.Empty)
-                {
-                    name = NW.Recieve(stream).Get_Data();
-                }
+                    mes = NW.Recieve(stream);
 
+                if (!(mes is ErrorMessage))
+                {
+                    name = mes.Get_Data();
+                }
+                else
+                {
+                    Thread.CurrentThread.Abort();
+                }
                 // Отчет о начале передачи.
                 Console.WriteLine("Handling thread: Start sending protocol for " + name);
 
@@ -64,14 +70,23 @@ namespace Server_Hub
         public void Handle_Recieve()
 
         {
+            Message mes = new Message(string.Empty);
             // Строка для хранения имени запрашиваемого файла.
             string flnme = "";
             
             while (true)
             {
                 // Получение имени файла.
-                flnme = NW.Recieve(stream).Get_Data();
+                mes = NW.Recieve(stream);
 
+                if (!(mes is ErrorMessage))
+                {
+                    flnme = mes.Get_Data();
+                }
+                else
+                {
+                    Thread.CurrentThread.Abort();
+                }
                 // Отчет о начале передачи.
                 Console.WriteLine("Handling thread: Start receiving protocol for " + flnme);
 
