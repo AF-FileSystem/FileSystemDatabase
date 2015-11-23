@@ -50,6 +50,7 @@ namespace Server_Hub
 
                 // Запуск передачи файла.
                 File_Translator FT = new File_Translator(client, name);
+                name = string.Empty;
                 Thread h = new Thread(FT.Sending);
                 h.Start();
 
@@ -127,17 +128,20 @@ namespace Server_Hub
             using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
             using (NetworkStream stream = new NetworkStream(client))
             {
+                NW.Send(response, stream);
                 do
                 {
                     mes = NW.Recieve(stream);
-
-                    if (!(mes is EndMessage))
+                    if (mes != null)
                     {
-                        // Запись в файл.
-                        outFile.Write(mes.Get_Info(), 0, mes.Get_Info().Length);
+                        if (!(mes is EndMessage))
+                        {
+                            // Запись в файл.
+                            outFile.Write(mes.Get_Info(), 0, mes.Get_Info().Length);
 
-                        // Отправка уведомления клиенту.
-                        NW.Send(response, stream);
+                            // Отправка уведомления клиенту.
+                            NW.Send(response, stream);
+                        }
                     }
                 } while (!(mes is EndMessage));
 
@@ -223,7 +227,6 @@ namespace Server_Hub
                     stream.Write(Mes_Hand.Encrypt(Err), 0, Mes_Hand.Encrypt(Err).Length);
                 }
             }
-
         }
         
     }

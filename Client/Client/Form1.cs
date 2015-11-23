@@ -52,9 +52,9 @@ namespace Client
             // Выделение потока для получения списка файлов.
             NetworkStream stream = clnt.GetStream();
             // Сообщение о типе клиента.
-            Inform_of_Rec_Message mes = new Inform_of_Rec_Message(string.Empty);
+            Inform_of_Rec_Message mes = new Inform_of_Rec_Message("Rec");
             // Сообщение c именем файла из списка.
-            Messages.Message LM = new ListMessage(string.Empty);
+            Messages.Message LM = new ListMessage("Rec");
 
             try
             {
@@ -93,7 +93,7 @@ namespace Client
             // Выделение потока для получения списка файлов.
             NetworkStream stream = clnt.GetStream();
             // Сообщение о типе клиента.
-            Inform_of_Down_Message mes = new Inform_of_Down_Message(string.Empty);
+            Inform_of_Down_Message mes = new Inform_of_Down_Message("Down");
             
             // Оправка уведомления о типе клиента.
             NW.Send(mes, stream);
@@ -212,9 +212,9 @@ namespace Client
             // Сообщение содержащее часть файла.
             Messages.Message mes;
             // Сообщение содержащее имя файла.
-            RequestMessage name;
+            RequestMessage name = new RequestMessage(s);
             // Сообщение содержащее подтверждение получения.
-            Messages.Message resp = new ResponseMessage(string.Empty);
+            Messages.Message resp;
             // Размер буффера считываемых данных.
             const int buffersz = 16384;
             // Буффер для частей файла.
@@ -232,8 +232,6 @@ namespace Client
                 using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (NetworkStream stream = clnt.GetStream())
                 {
-                    name = new RequestMessage(s);
-
                     // Отправка имени файла.
                     NW.Send(name, stream);
 
@@ -262,7 +260,7 @@ namespace Client
 
                                 if (resp.Get_Data() != "")
                                 {
-                                    resp = new Messages.Message(string.Empty);
+                                    resp = new ResponseMessage(string.Empty);
                                     break;
                                 }
                             }
@@ -312,17 +310,16 @@ namespace Client
         public void Receiving(string s)
         {
             // Обработанное входящее сообщение.
-            Messages.Message mess;
+            Messages.Message mess = new FilePartMessage(string.Empty);
             // Сообщение содержащее имя.
             RequestMessage name;
             // Уведомительное сообщение.
-            ResponseMessage response = new ResponseMessage(string.Empty);
+            ResponseMessage response = new ResponseMessage("Response");
             // Буффер для получения ответа.
             byte[] pack = new byte[1024];
 
             // Выделение пути к файлу.
             string path = Path.Combine(cl_path, s);
-            
             // Выделение потоков для получения файла.
             using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
             using (NetworkStream stream = clnt.GetStream())

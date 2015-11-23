@@ -73,42 +73,52 @@ namespace Messages
             // Строка, полученная из полученного массива байт.
             string str = Encoding.ASCII.GetString(b);
             // Тип сообщений.
-            int type = (int)str[0];
-            // Строка данных.
-            string assis = str.Substring(1, str.Length - 1);
-            // Определение типа сообщения.
-            switch (type)
+            if (str[0] != '\0')
             {
-                case 0:
-                    mes = new Inform_of_Down_Message(assis);
-                    break;
-                case 1:
-                    mes = new Inform_of_Rec_Message(assis);
-                    break;
-                case 2:
-                    mes = new ListMessage(assis);
-                    break;
-                case 3:
-                    mes = new RequestMessage(assis);
-                    break;
-                case 4:
-                    mes = new FilePartMessage(assis);
-                    break;
-                case 5:
-                    mes = new EndMessage(assis);
-                    break;
-                case 6:
-                    mes = new ResponseMessage(assis);
-                    break;
-                case 7:
-                    mes = new ErrorMessage(assis);
-                    break;
-                default:
-                    mes = new Message(assis);
-                    break;
+                int type = int.Parse(str[0].ToString());
+                int border = str.IndexOf('\0');
+                if (type != -1)
+                {
+                    // Строка данных.
+                    string assis = str.Substring(1, border - 1);
+                    // Определение типа сообщения.
+                    switch (type)
+                    {
+                        case 0:
+                            mes = new Inform_of_Down_Message(assis);
+                            break;
+                        case 1:
+                            mes = new Inform_of_Rec_Message(assis);
+                            break;
+                        case 2:
+                            mes = new ListMessage(assis);
+                            break;
+                        case 3:
+                            mes = new RequestMessage(assis);
+                            break;
+                        case 4:
+                            mes = new FilePartMessage(assis);
+                            break;
+                        case 5:
+                            mes = new EndMessage(assis);
+                            break;
+                        case 6:
+                            mes = new ResponseMessage(assis);
+                            break;
+                        case 7:
+                            mes = new ErrorMessage(assis);
+                            break;
+                        default:
+                            mes = new Message(assis);
+                            break;
+                    }
+                }
+                else
+                    mes = new Message(string.Empty);
+                return mes;
             }
-            var m = new Inform_of_Rec_Message("asd");
-            return m;
+            else
+                return new Message(string.Empty);
         }
     }
 
