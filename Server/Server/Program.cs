@@ -5,6 +5,7 @@ using System.Net;
 using System.IO;
 using System.Threading;
 using Messages;
+using System.Collections.Generic;
 
 
 namespace Server_Hub
@@ -20,13 +21,17 @@ namespace Server_Hub
         Message_Handler Mes_Hand = new Message_Handler();
         // Отвечает за отправку и получение сообщений.
         NetWorking NW = new NetWorking();
-        
-        public Request_Handler(Socket c)
+        // Список файлов.
+        Dictionary<string, NetworkStream> Files;
+
+        public Request_Handler(Socket c, Dictionary<string, NetworkStream> d)
         {
             // Сокет для коммуникации с клиентом.
             client = c;
             // Поток общения с клиентом.
             stream = new NetworkStream(client);
+            // Файлы.
+            Files = d;
         }
 
         // Протокол обработки запроса на отправку файла.
@@ -49,13 +54,14 @@ namespace Server_Hub
                 }
                 else
                 {
+                    Console.WriteLine("Ending session");
                     Thread.CurrentThread.Abort();
                 }
                 // Отчет о начале передачи.
                 Console.WriteLine("Handling thread: Start sending protocol for " + name);
 
                 // Запуск передачи файла.
-                File_Translator FT = new File_Translator(client, name);
+                File_Translator FT = new File_Translator(client, name, Files);
                 name = string.Empty;
                 Thread h = new Thread(FT.Sending);
                 h.Start();
@@ -85,13 +91,14 @@ namespace Server_Hub
                 }
                 else
                 {
+                    Console.WriteLine("Ending session");
                     Thread.CurrentThread.Abort();
                 }
                 // Отчет о начале передачи.
                 Console.WriteLine("Handling thread: Start receiving protocol for " + flnme);
 
                 // Запуск передачи файла.
-                File_Translator FT = new File_Translator(client, flnme);
+                File_Translator FT = new File_Translator(client, flnme, Files);
                 Thread h = new Thread(FT.Receiving);
                 h.Start();
 
@@ -117,13 +124,17 @@ namespace Server_Hub
         Message_Handler Mes_Hand = new Message_Handler();
         // Отвечает за отправку/поучение сообщений.
         NetWorking NW = new NetWorking();
+        // Список файлов.
+        Dictionary<string, NetworkStream> Files;
 
-        public File_Translator(Socket c, string n)
+        public File_Translator(Socket c, string n, Dictionary<string, NetworkStream> d)
         {
             // Сокет для коммуникации с клиентом.
             client = c;
             // Имя обрабатываемого файла.
             flname = n;
+            // Файлы.
+            Files = d;
         }
 
         // Протокол получения файла.
@@ -251,12 +262,14 @@ namespace Server_Hub
     {
         // Порт для подключения клиентов.
         static Int16 port = 13000;
-        // Путь к файлам сервера.
-        static string server_destination = @"D:\DFS";
         // Обработчик сообщений.
         static Message_Handler Mes_Hand = new Message_Handler();
         // Отвечает за отправку и получение сообщений.
         static NetWorking NW = new NetWorking();
+        // Список файлов.
+        static Dictionary<string, NetworkStream> Files = new Dictionary<string, NetworkStream>();
+        // Хранилища.
+        static List<Socket> Hubs = new List<Socket>();
 
         // Работа с подключением.
         public static void Working_With(object income)
@@ -280,20 +293,73 @@ namespace Server_Hub
                     Send_List(stream);
 
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
-                    Request_Handler RH = new Request_Handler(client);
+                    Request_Handler RH = new Request_Handler(client,Files);
                     new Thread(RH.Handle_Send).Start();
                     Console.WriteLine("Waiting for choosing the file...");
                     break;
                 }
                 else
                 {
-                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилище.
-                    Request_Handler RH = new Request_Handler(client);
-                    new Thread(RH.Handle_Recieve).Start();
-                    Console.WriteLine("Waiting for downloading the file...");
-                    break;
+                    if (mess is Inform_of_Down_Message)
+                    {
+                        // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилище.
+                        Request_Handler RH = new Request_Handler(client, Files);
+                        new Thread(RH.Handle_Recieve).Start();
+                        Console.WriteLine("Waiting for downloading the file...");
+                        break;
+                    }
+                    else
+                    {
+                        new Thread(List_Recieving).Start(stream);
+                        Console.WriteLine("Recieving list of files...");
+                        break;
+                    }
                 }
             }
+        }
+
+        // Получение списка.
+        public static void List_Recieving(object income)
+        {
+            // Буффер входящих сообщений.
+            Byte[] bytes = new Byte[1024];
+            // Выделение потока для обмена информацией с клиентом.
+            NetworkStream stream = (NetworkStream)income;
+            // Запрос файлов.
+            RequestMessage req = new RequestMessage("Send me");
+            // Ответ.
+            ResponseMessage res = new ResponseMessage("Response");
+            // Сообщение полученное от клиента.
+            Message LM;
+
+            try
+            {
+                // Оправка уведомления о готовности.
+                NW.Send(req, stream);
+
+                // Получение списка файлов.
+                do
+                {
+                    // Прочесть ответ сервера.
+                    LM = NW.Recieve(stream);
+
+                    // Проверить является ли ответ именем файла.
+                    if (!(LM is EndMessage))
+                    {
+                        // Добавление файла в список.
+                        Files.Add(LM.Get_Data(), stream);
+
+                        // Отослать назад уведомление.
+                        NW.Send(res, stream);
+                    }
+                } while (!(LM is EndMessage));
+
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: " + ex.Message);
+            }
+
         }
 
         // Протокол отправки сообщения.
@@ -301,28 +367,19 @@ namespace Server_Hub
         {
             // Буффер входящих сообщений.
             Byte[] bytes = new Byte[1024];
-            // Строка содержащая имя файла.
-            string file_name;
             // Выделение потока для обмена информацией с клиентом.
             NetworkStream stream = (NetworkStream)income;
-            // Определение файлов в директории.
-            string[] dirs = Directory.GetFiles(server_destination);
             // Сообщение полученное от клиента.
             Message M;
 
-            // Отправка информации о каждом файле.
-            for (int q = 0; q < dirs.Length; q++)
-            {
-                // Подготовка информации о файле.
-                FileInfo inf = new FileInfo(dirs[q]);
-                // Строка хранящая имя файла.
-                file_name = (Path.GetFileName(dirs[q]));
+            foreach(var f in Files)
+            {                
                 // Создание сообщения.
-                ListMessage LM = new ListMessage(file_name);
+                ListMessage LM = new ListMessage(f.Key);
                 // Отправка сообщения.
                 NW.Send(LM, stream);
                 // Уведомление об успешной отправке.
-                Console.WriteLine("Main thread: Sent info of: {0}", file_name);
+                Console.WriteLine("Main thread: Sent info of: {0}", f.Key);
 
                 // Ожидание получения подтверждения о приеме информации.
                 while (true)
