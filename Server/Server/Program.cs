@@ -23,8 +23,10 @@ namespace Server_Hub
         NetWorking NW = new NetWorking();
         // Список файлов.
         Dictionary<string, NetworkStream> Files;
+        // Хранилища.
+        static List<NetworkStream> Hubs = new List<NetworkStream>();
 
-        public Request_Handler(Socket c, Dictionary<string, NetworkStream> d)
+        public Request_Handler(Socket c, Dictionary<string, NetworkStream> d, List<NetworkStream> h)
         {
             // Сокет для коммуникации с клиентом.
             client = c;
@@ -32,6 +34,8 @@ namespace Server_Hub
             stream = new NetworkStream(client);
             // Файлы.
             Files = d;
+            // Хабы.
+            Hubs = h;
         }
 
         // Протокол обработки запроса на отправку файла.
@@ -61,7 +65,7 @@ namespace Server_Hub
                 Console.WriteLine("Handling thread: Start sending protocol for " + name);
 
                 // Запуск передачи файла.
-                File_Translator FT = new File_Translator(client, name, Files);
+                File_Translator FT = new File_Translator(client, name, Files, Hubs);
                 name = string.Empty;
                 Thread h = new Thread(FT.Sending);
                 h.Start();
@@ -98,7 +102,7 @@ namespace Server_Hub
                 Console.WriteLine("Handling thread: Start receiving protocol for " + flnme);
 
                 // Запуск передачи файла.
-                File_Translator FT = new File_Translator(client, flnme, Files);
+                File_Translator FT = new File_Translator(client, flnme, Files, Hubs);
                 Thread h = new Thread(FT.Receiving);
                 h.Start();
 
@@ -126,8 +130,10 @@ namespace Server_Hub
         NetWorking NW = new NetWorking();
         // Список файлов.
         Dictionary<string, NetworkStream> Files;
+        // Хранилища.
+        static List<NetworkStream> Hubs = new List<NetworkStream>();
 
-        public File_Translator(Socket c, string n, Dictionary<string, NetworkStream> d)
+        public File_Translator(Socket c, string n, Dictionary<string, NetworkStream> d, List<NetworkStream> h)
         {
             // Сокет для коммуникации с клиентом.
             client = c;
@@ -135,25 +141,24 @@ namespace Server_Hub
             flname = n;
             // Файлы.
             Files = d;
+            // Хабы.
+            Hubs = h;
         }
 
         // Протокол получения файла.
         public void Receiving()
         {
-            // Буффер входящих данных.
-            byte[] bytes = new Byte[1024];
-            // Страка для хранения обработанного ответа.
-            string decrypted = string.Empty;
-            // Буффер для хранения сообщения клиента.
-            byte[] pack = new byte[1024];
             // Уведомление о получении.
             Message response = new ResponseMessage("Response");
             // Выделение пути к файлу.
             string path = Path.Combine(@"D:\DFS", flname);
+            // Уведомление о типе трансляции хаба.
+            Inform_of_Rec_Message rec = new Inform_of_Rec_Message(Path.GetFileName(flname));
 
-            using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
+            NW.Send(rec, Hubs[0]);
             using (NetworkStream stream = new NetworkStream(client))
             {
+                // Отправка уведомления клиенту.
                 NW.Send(response, stream);
                 do
                 {
@@ -162,97 +167,82 @@ namespace Server_Hub
                     {
                         if (!(mes is EndMessage))
                         {
-                            // Запись в файл.
-                            outFile.Write(mes.Get_Info(), 0, mes.Get_Info().Length);
+                            // Отправка сообщения хабу.
+                            NW.Send(mes, Hubs[0]);
+
+                            // Ожидание ответа.
+                            do
+                            {
+                                response = NW.Recieve(Hubs[0]);
+                            }
+                            while (response.Get_Data() == string.Empty);
 
                             // Отправка уведомления клиенту.
                             NW.Send(response, stream);
+                        }
+                        else
+                        {
+                            mes = new EndMessage("End of file.");
+                            NW.Send(mes, Hubs[0]);
                         }
                     }
                 } while (!(mes is EndMessage));
 
                 // Уведомление об окончании операции.
-                Console.WriteLine("Downloading is complete!");
+                Console.WriteLine("Transmisson is complete!");
             }
         }
 
         // Протокол отправки файла.
         public void Sending()
         {
-            // Строка для хранения необработанного ответа.
-            string assis = string.Empty;
-            // Строка для хранения обработанного ответа.
-            string decrypted = string.Empty;
-            // Буффер для хранения полученного ответа.
-            byte[] bytes = new byte[1024];
-            // Объем буффера передаваемых данных.
-            const int buffersz = 16384;
-            // Буффер содержащий передаваемый пакет данных.
-            byte[] buffer = new byte[buffersz];
-            //Количество считанных байт.
-            int btscpd = 0;
-            // Строка для отправки уведомлений.
-            byte[] message = new byte[1024];
             // Сообщение для коммуникации с клиентом.
             Message file_part = new FilePartMessage(string.Empty);
             // Сообщение для обработки подтверждения.
-            Message response = new ResponseMessage(string.Empty);
+            Message response = new ResponseMessage("resp");
+            // Уведомление о типе трансляции хаба.
+            Inform_of_Down_Message down = new Inform_of_Down_Message(Path.GetFileName(flname));
+            // Поток общения с хабом.
+            NetworkStream Cur_Hub;
+            Files.TryGetValue(flname, out Cur_Hub);
 
-            // Выделение пути к запрашиваемому файлу.
-            string path = Path.Combine(@"D:\DFS", flname);
+            NW.Send(down, Cur_Hub);
 
-            // Провека существования запрашиваемого файла.
-            if (File.Exists(path))
-            {
-                // Начало передачи.
-                using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (NetworkStream stream = new NetworkStream(client))
                 {
+                    NW.Send(response, Cur_Hub);
                     do
                     {
-                        // Считывание данных из файла.
-                        btscpd = inFile.Read(buffer, 0, buffersz);
-                        file_part = new FilePartMessage(Encoding.ASCII.GetString(buffer));
-
-                        // Проверка на наличие неотправленных данных.
-                        if (btscpd > 0)
+                        mes = NW.Recieve(Cur_Hub);
+                        if (mes != null)
                         {
-                            // Отправка пакета.
-                            NW.Send(file_part, stream);
+                        if (!(mes is EndMessage))
+                        {
+                            // Отправка сообщения клиенту.
+                            NW.Send(mes, stream);
 
-                            // Получение подтверждения.
-                            while (true)
+                            // Ожидание ответа.
+                            do
                             {
                                 response = NW.Recieve(stream);
-
-                                if (response.Get_Data()!=string.Empty)
-                                {
-                                    response = new ResponseMessage(string.Empty);
-                                    break;
-                                }
                             }
+                            while (response.Get_Data() == string.Empty);
+
+                            // Отправка уведомления хабу.
+                            NW.Send(response, Cur_Hub);
                         }
-                    } while (btscpd > 0);
+                        else
+                        {
+                            mes = new EndMessage("End of file.");
+                            NW.Send(mes, stream);
+                        }
+                        }
+                    } while (!(mes is EndMessage));
 
-                    // Отправка уведомления о конце файла.
-                    file_part = new EndMessage("End of file");
-                    NW.Send(file_part, stream);
-
-                    // Уведомление о завершении процесса.
-                    Console.WriteLine("Translation thread: File has been sent.");
+                    // Уведомление об окончании операции.
+                    Console.WriteLine("Downloading is complete!");
                 }
-
-            }
-            else
-            {
-                // Выделение потока для отправки сообщения.
-                using (NetworkStream stream = new NetworkStream(client))
-                {
-                    // !!!Встасить увделомление об отсутствии запрашиваемого файла!!!                
-                    ErrorMessage Err = new ErrorMessage(string.Empty);
-                    stream.Write(Mes_Hand.Encrypt(Err), 0, Mes_Hand.Encrypt(Err).Length);
-                }
-            }
+                
         }
         
     }
@@ -269,7 +259,7 @@ namespace Server_Hub
         // Список файлов.
         static Dictionary<string, NetworkStream> Files = new Dictionary<string, NetworkStream>();
         // Хранилища.
-        static List<Socket> Hubs = new List<Socket>();
+        static List<NetworkStream> Hubs = new List<NetworkStream>();
 
         // Работа с подключением.
         public static void Working_With(object income)
@@ -293,7 +283,7 @@ namespace Server_Hub
                     Send_List(stream);
 
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
-                    Request_Handler RH = new Request_Handler(client,Files);
+                    Request_Handler RH = new Request_Handler(client,Files, Hubs);
                     new Thread(RH.Handle_Send).Start();
                     Console.WriteLine("Waiting for choosing the file...");
                     break;
@@ -303,13 +293,14 @@ namespace Server_Hub
                     if (mess is Inform_of_Down_Message)
                     {
                         // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилище.
-                        Request_Handler RH = new Request_Handler(client, Files);
+                        Request_Handler RH = new Request_Handler(client, Files,Hubs);
                         new Thread(RH.Handle_Recieve).Start();
                         Console.WriteLine("Waiting for downloading the file...");
                         break;
                     }
                     else
                     {
+                        Hubs.Add(stream);
                         new Thread(List_Recieving).Start(stream);
                         Console.WriteLine("Recieving list of files...");
                         break;
@@ -340,7 +331,7 @@ namespace Server_Hub
                 // Получение списка файлов.
                 do
                 {
-                    // Прочесть ответ сервера.
+                    // Прочесть ответ хаба.
                     LM = NW.Recieve(stream);
 
                     // Проверить является ли ответ именем файла.

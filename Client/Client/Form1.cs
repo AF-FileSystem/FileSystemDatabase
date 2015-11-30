@@ -21,7 +21,7 @@ namespace Client
         // Текущий выбранный файл.
         string act;
         // IP сервера.
-        public static string adress = "192.168.7.103";
+        public static string adress = "192.168.7.106";
         // Тср-клиент для сервера.
         public static TcpClient clnt = new TcpClient(adress, 13000);
         // Директория файлов клиента.
@@ -200,6 +200,11 @@ namespace Client
 
         private void newSessionToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            ErrorMessage er = new ErrorMessage("LOL");
+            NW.Send(er, clnt.GetStream());
+            Thread.Sleep(1500);
+            listView1.Items.Clear();
+            panel1.Visible = true;
         }
     }
 

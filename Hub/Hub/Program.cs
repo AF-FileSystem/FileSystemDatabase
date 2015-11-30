@@ -12,7 +12,7 @@ namespace Hub
     class Program
     {
         // IP сервера.
-        public static string adress = "192.168.7.103";
+        public static string adress = "192.168.7.106";
         // Тср-клиент для сервера.
         public static TcpClient clnt = new TcpClient(adress, 13000);
         // Директория файлов клиента.
@@ -115,17 +115,17 @@ namespace Hub
                 // Проверка типа сообщния.
                 if (mess is Inform_of_Rec_Message)
                 {
-                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилища.
-                    Translator TR = new Translator(stream, mess.Get_Data());
-                    new Thread(TR.Recieve).Start();
+                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилища.
+                    Translator TR = new Translator(mess.Get_Data());
+                    new Thread(TR.Recieve).Start(stream);
                     Console.WriteLine("Waiting for choosing the file...");
                     break;
                 }
                 else
                 {
-                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилище.
-                    Translator TR = new Translator(stream, mess.Get_Data());
-                    new Thread(TR.Recieve).Start();
+                    // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилище.
+                    Translator TR = new Translator(mess.Get_Data());
+                    new Thread(TR.Send).Start(stream);
                     Console.WriteLine("Waiting for downloading the file...");
                     break;
                 }
@@ -156,15 +156,15 @@ namespace Hub
         Message_Handler Mes_Hand = new Message_Handler();
         string name;
 
-        public Translator(NetworkStream ns, string s)
+        public Translator(string s)
         {
-            stream = ns;
             name = s;
         }
 
         // Отправка файла.
-        public void Send()
+        public void Send(object income)
         {
+            stream = (NetworkStream)income;
             // Строка для хранения необработанного ответа.
             string assis = string.Empty;
             // Строка для хранения обработанного ответа.
@@ -193,8 +193,17 @@ namespace Hub
                 // Начало передачи.
                 using (FileStream inFile = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 {
+                    // Ожидание ответа.
                     do
                     {
+                        response = NW.Recieve(stream);
+                    }
+                    while (response.Get_Data() == string.Empty);
+
+                    do
+                    {
+
+
                         // Считывание данных из файла.
                         btscpd = inFile.Read(buffer, 0, buffersz);
                         file_part = new FilePartMessage(Encoding.ASCII.GetString(buffer));
@@ -230,8 +239,9 @@ namespace Hub
         }
 
         // Получение файла.
-        public void Recieve()
+        public void Recieve(object income)
         {
+            stream = (NetworkStream)income;
             // Буффер входящих данных.
             byte[] bytes = new Byte[1024];
             // Страка для хранения обработанного ответа.
@@ -245,7 +255,6 @@ namespace Hub
 
             using (FileStream outFile = File.Open(path, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                NW.Send(response, stream);
                 do
                 {
                     mes = NW.Recieve(stream);
