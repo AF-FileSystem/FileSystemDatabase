@@ -51,6 +51,10 @@ namespace Messages
             {
                 type = 7;
             }
+            if (m is HubInformMessage)
+            {
+                type = 8;
+            }
 
             // Буффер для передачи данных.
             byte[] bytes = new byte[1024];
@@ -77,6 +81,10 @@ namespace Messages
             {
                 int type = int.Parse(str[0].ToString());
                 int border = str.IndexOf('\0');
+                if (border==(-1))
+                {
+                    border = str.Length;
+                }
                 if (type != -1)
                 {
                     // Строка данных.
@@ -108,6 +116,9 @@ namespace Messages
                         case 7:
                             mes = new ErrorMessage(assis);
                             break;
+                        case 8:
+                            mes = new HubInformMessage(assis);
+                            break;
                         default:
                             mes = new Message(assis);
                             break;
@@ -119,6 +130,11 @@ namespace Messages
             }
             else
                 return new Message(string.Empty);
+        }
+
+        public void Change_Data(string s, Message m)
+        {
+            m.Set_Data(s);
         }
     }
 
@@ -144,6 +160,11 @@ namespace Messages
             byte[] b;
             b = Encoding.ASCII.GetBytes(text);
             return b;
+        }
+
+        public void Set_Data(string s)
+        {
+            text = s;
         }
     }
 
@@ -215,6 +236,15 @@ namespace Messages
     public class ErrorMessage : Message
     {
         public ErrorMessage(string s) : base(s)
+        {
+            text = s;
+        }
+    }
+
+    // Сообщение о подключении хаба (8).
+    public class HubInformMessage : Message
+    {
+        public HubInformMessage(string s) : base(s)
         {
             text = s;
         }

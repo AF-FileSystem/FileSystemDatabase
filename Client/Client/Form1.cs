@@ -21,7 +21,7 @@ namespace Client
         // Текущий выбранный файл.
         string act;
         // IP сервера.
-        public static string adress = "192.168.7.106";
+        public static string adress = "192.168.7.101";
         // Тср-клиент для сервера.
         public static TcpClient clnt = new TcpClient(adress, 13000);
         // Директория файлов клиента.
@@ -183,6 +183,7 @@ namespace Client
                 StartUploadClient(listView1);
             }
         }
+
         // Перевод клиента в режим загрузки файлов на сервер.
         private void button4_Click(object sender, EventArgs e)
         {
@@ -195,7 +196,7 @@ namespace Client
         {
             ErrorMessage er = new ErrorMessage("LOL");
             NW.Send(er, clnt.GetStream());
-            Thread.Sleep(3000);
+            Thread.Sleep(1500);
         }
 
         private void newSessionToolStripMenuItem_Click(object sender, EventArgs e)
@@ -203,6 +204,7 @@ namespace Client
             ErrorMessage er = new ErrorMessage("LOL");
             NW.Send(er, clnt.GetStream());
             Thread.Sleep(1500);
+            clnt = new TcpClient(adress, 13000);
             listView1.Items.Clear();
             panel1.Visible = true;
         }
@@ -237,7 +239,7 @@ namespace Client
             // Сообщение содержащее подтверждение получения.
             Messages.Message resp;
             // Размер буффера считываемых данных.
-            const int buffersz = 16384;
+            const int buffersz = 1022;
             // Буффер для частей файла.
             byte[] buffer = new byte[buffersz];
             // Размер считанных данных.

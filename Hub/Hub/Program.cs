@@ -12,7 +12,7 @@ namespace Hub
     class Program
     {
         // IP сервера.
-        public static string adress = "192.168.7.106";
+        public static string adress = "192.168.7.101";
         // Тср-клиент для сервера.
         public static TcpClient clnt = new TcpClient(adress, 13000);
         // Директория файлов клиента.
@@ -33,7 +33,7 @@ namespace Hub
             // Выделение потока для получения списка файлов.
             NetworkStream stream = clnt.GetStream();
             // Сообщение о типе клиента.
-            Messages.ListMessage mes = new ListMessage("Hub");
+            HubInformMessage mes = new HubInformMessage("Hub");
             // Сообщение c именем файла из списка.
             Message LM;
 
@@ -107,7 +107,7 @@ namespace Hub
         {
             // Выделение экземпляра класса Message для распознавания ответа.
             Message mess;
-
+            Thread Current_Translation;
             while (true)
             {
                 mess = NW.Recieve(stream);
@@ -117,18 +117,19 @@ namespace Hub
                 {
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл в хранилища.
                     Translator TR = new Translator(mess.Get_Data());
-                    new Thread(TR.Recieve).Start(stream);
+                    Current_Translation = new Thread(TR.Recieve);
+                    Current_Translation.Start(stream);
                     Console.WriteLine("Waiting for choosing the file...");
-                    break;
                 }
                 else
                 {
                     // Выделение потока для обработки запросов с указанием того, что клиент хочет загрузить файл из хранилище.
                     Translator TR = new Translator(mess.Get_Data());
-                    new Thread(TR.Send).Start(stream);
+                    Current_Translation = new Thread(TR.Send);
+                    Current_Translation.Start(stream);
                     Console.WriteLine("Waiting for downloading the file...");
-                    break;
                 }
+                Current_Translation.Join();
             }
         }
 
@@ -172,7 +173,7 @@ namespace Hub
             // Буффер для хранения полученного ответа.
             byte[] bytes = new byte[1024];
             // Объем буффера передаваемых данных.
-            const int buffersz = 16384;
+            const int buffersz = 1022;
             // Буффер содержащий передаваемый пакет данных.
             byte[] buffer = new byte[buffersz];
             //Количество считанных байт.
